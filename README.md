@@ -26,6 +26,47 @@ You can now select Santa as your desktop companion to bring some festive cheer t
 *   **Interactive Drag & Drop with Momentum**: Pick up gnomelets with your mouse and toss them! They now support physics-based throwing—release them while moving the mouse to fling them across the screen.
 *   **Dash to Dock (Ubuntu Dock) & Dash to Panel Support**: Gnomelets can now recognize, land on, and explore both Dash to Dock (Ubuntu Dock) and Dash to Panel if they are present on your screen!
 
+## AI-Powered Conversations
+
+Gnomelets now feature **AI-powered conversations**! Your desktop companions can talk with you and each other using large language models.
+
+### Features
+
+*   **Chat with Your Pet**: Double-click on a gnomelet to start a conversation! An input bubble will appear, following the pet as it moves around your screen.
+*   **Multi-Provider Support**: Connect to various AI services:
+    *   OpenAI (GPT-4, GPT-3.5 Turbo)
+    *   Anthropic (Claude)
+    *   Google Gemini
+    *   Ollama (local models)
+    *   LM Studio (local models)
+    *   Azure OpenAI
+    *   Custom OpenAI-compatible APIs
+*   **Pet Personalities**: Customize each pet's:
+    *   **Personality**: Set how your pet behaves (friendly, playful, shy, etc.)
+    *   **Background**: Give your pet a unique backstory
+    *   **Speaking Style**: Configure how they talk (cute, formal, casual, etc.)
+*   **Conversation Memory**: Pets remember recent conversations and can reference them in chats
+*   **Pet-to-Pet Chat**: Enable two gnomelets to have conversations with each other! They can discuss topics, play games, or just hang out
+*   **Spontaneous Interactions**: When AI is enabled, gnomelets may occasionally trigger random conversations or interactions on their own
+
+### AI Configuration
+
+In the extension settings, you can configure:
+
+*   **Enable AI**: Toggle AI features on/off
+*   **AI Provider**: Select your preferred AI service
+*   **API Key**: Enter your API key for the selected provider
+*   **Model**: Choose the specific model to use
+*   **Base URL**: For local or custom providers (Ollama, LM Studio, etc.)
+*   **Test Connection**: Verify your AI setup is working correctly
+
+### Quick Start
+
+1.  Enable AI in extension settings
+2.  Select your AI provider and enter your API key
+3.  Double-click on a gnomelet to start chatting!
+4.  Customize your pet's personality in the settings
+
 ## Configuration
 
 You can customize your experience via the extension settings:
