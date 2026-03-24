@@ -343,10 +343,10 @@ export const Gnomelet = GObject.registerClass(
                         font-family: monospace;`,
       });
 
-      // this._nameLabel = new St.Label({
-      //   text: petName,
-      //   style: `color: ${nameColor}; font-weight: bold; font-size: 14px; font-family: monospace;margin-left: 4px;`,
-      // });
+      this._nameLabel = new St.Label({
+        text: petName,
+        style: `color: ${nameColor}; font-weight: bold; font-size: 14px; font-family: monospace;margin-left: 4px;`,
+      });
 
       this._bubbleLabel = new St.Label({
         text: ".",
@@ -363,7 +363,7 @@ export const Gnomelet = GObject.registerClass(
 
       this._bubbleContainer = new St.Widget({
         x: this._x + (this._displayW - bubbleWidth) / 2,
-        y: this._y - 55,
+        y: this._y - 20,
         width: bubbleWidth,
         height: 50,
       });
@@ -387,7 +387,7 @@ export const Gnomelet = GObject.registerClass(
         const bubbleWidth = 80;
         this._bubbleContainer.set_position(
           this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 55,
+          this._y - 20,
         );
       }
     }
@@ -429,13 +429,17 @@ export const Gnomelet = GObject.registerClass(
         vertical: true,
         style: "spacing: 2px;",
       });
-      this._bubbleContent.add_child(this._nameLabel);
+      let bubbleMargin = 20;
+      if (!isOwner) {
+        this._bubbleContent.add_child(this._nameLabel);
+        bubbleMargin = 65;
+      }
       this._bubbleContent.add_child(label);
       this._bubbleActor.add_child(this._bubbleContent);
 
       this._bubbleContainer = new St.Widget({
         x: this._x + (this._displayW - bubbleWidth) / 2,
-        y: this._y - 55,
+        y: this._y - bubbleMargin,
         width: bubbleWidth,
         height: 55,
       });
@@ -475,7 +479,7 @@ export const Gnomelet = GObject.registerClass(
         const bubbleWidth = this._bubbleContainer.width;
         this._bubbleContainer.set_position(
           this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 55,
+          this._y - 60,
         );
       }
 
@@ -483,7 +487,7 @@ export const Gnomelet = GObject.registerClass(
         const bubbleWidth = 80;
         this._bubbleContainer.set_position(
           this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 55,
+          this._y - 60,
         );
       }
 
