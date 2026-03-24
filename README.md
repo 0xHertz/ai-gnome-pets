@@ -1,17 +1,12 @@
-# Gnomelets 🎅
+# AI-Gnome-Pets 🎅
 
-Brighten up your GNOME desktop with **Gnomelets**! This extension brings small, animated 2D characters to life, letting them roam freely across your screen. They walk, jump, and even balance on top of your open windows.
-
+Brighten up your GNOME desktop with **AI-Gnome-Pets**! This extension brings small, animated 2D characters to life, letting them roam freely across your screen. They walk, jump, and even balance on top of your open windows.
 
 Watch as they fall from the top of the screen, land on your active windows, and explore your desktop environment with charming pixel-art animations.
 
-https://github.com/user-attachments/assets/2a6e47ec-c063-4d65-87ba-e7559144d641
+## Original Project
 
-## 🎄 Christmas Special Edition 🎄
-
-**Ho Ho Ho!**
-In the spirit of the holiday season, we have added a special guest: **Santa Claus**! 
-You can now select Santa as your desktop companion to bring some festive cheer to your workflow.
+[Gnomelets](https://github.com/ihpled/gnomelets)
 
 ## Features
 
@@ -49,17 +44,6 @@ Gnomelets now feature **AI-powered conversations**! Your desktop companions can 
 *   **Pet-to-Pet Chat**: Enable two gnomelets to have conversations with each other! They can discuss topics, play games, or just hang out
 *   **Spontaneous Interactions**: When AI is enabled, gnomelets may occasionally trigger random conversations or interactions on their own
 
-### AI Configuration
-
-In the extension settings, you can configure:
-
-*   **Enable AI**: Toggle AI features on/off
-*   **AI Provider**: Select your preferred AI service
-*   **API Key**: Enter your API key for the selected provider
-*   **Model**: Choose the specific model to use
-*   **Base URL**: For local or custom providers (Ollama, LM Studio, etc.)
-*   **Test Connection**: Verify your AI setup is working correctly
-
 ### Quick Start
 
 1.  Enable AI in extension settings
@@ -78,6 +62,17 @@ You can customize your experience via the extension settings:
 *   **Dock Support**: Explicitly select "Dash to Dock (Ubuntu Dock)", "Dash to Panel", or "None" to optimize interaction.
 *   **Allows Interaction**: Now you can enable/disable the ability to drag and drop gnomelets with your mouse!
 *   **Jump Power**: Configure the vertical jump strength to make gnomelets hop higher or lower.
+
+### AI Configuration
+
+In the extension settings, you can configure:
+
+*   **Enable AI**: Toggle AI features on/off
+*   **AI Provider**: Select your preferred AI service
+*   **API Key**: Enter your API key for the selected provider
+*   **Model**: Choose the specific model to use
+*   **Base URL**: For local or custom providers (Ollama, LM Studio, etc.)
+*   **Test Connection**: Verify your AI setup is working correctly
 
 ## Adding Custom Characters
 
