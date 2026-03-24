@@ -17,17 +17,7 @@ export class AIService {
     const apiKey = this._getApiKey();
     const baseUrl = this._settings.get_string("ai-base-url") || "";
 
-    console.log(`[AI Service] chat() called`);
-    console.log(`[AI Service] Provider: ${provider}`);
-    console.log(`[AI Service] Model: ${model}`);
-    console.log(
-      `[AI Service] API Key: ${apiKey ? "***" + apiKey.slice(-4) : "empty"}`,
-    );
-    console.log(`[AI Service] Base URL: ${baseUrl || "(default)"}`);
-    console.log(`[AI Service] Prompt: "${prompt.substring(0, 50)}..."`);
-
     if (!apiKey) {
-      console.log(`[AI Service] No API key!`);
       return { success: false, error: "No API key configured" };
     }
 
@@ -224,10 +214,8 @@ export class AIService {
   }
 
   async _makeRequest(url, method, body, headers) {
-    console.log(`[AI Service] _makeRequest: ${method} ${url}`);
     return new Promise((resolve, reject) => {
       const session = new Soup.Session();
-      console.log(`[AI Service] Creating message with URI: ${url}`);
       const message = new Soup.Message({
         method: method,
         uri: GLib.Uri.parse(url, GLib.UriFlags.NONE),
@@ -243,19 +231,13 @@ export class AIService {
         message.set_request_body_from_bytes("application/json", bytes);
       }
 
-      // For libsoup3, use send_and_read_async
-      console.log(`[AI Service] Sending request...`);
       session.send_and_read_async(
         message,
         GLib.PRIORITY_DEFAULT,
         null,
         (sess, res) => {
-          console.log(
-            `[AI Service] Request callback, status: ${message.status_code}`,
-          );
           try {
             const bytes = session.send_and_read_finish(res);
-            console.log(`[AI Service] Got response bytes`);
             if (message.status_code >= 400) {
               reject(
                 new Error(
@@ -266,7 +248,6 @@ export class AIService {
             }
             resolve(bytes.get_data());
           } catch (e) {
-            console.error(`[AI Service] Error in request callback:`, e);
             reject(e);
           }
         },
@@ -388,9 +369,9 @@ export function buildSystemPrompt(petConfig, petName, typeName) {
   if (memory.length > 0) {
     prompt += `\n\nRecent memories of conversations:\n`;
     for (const msg of memory) {
-      if (msg.type === 'owner') {
+      if (msg.type === "owner") {
         prompt += `User: ${msg.content}\n`;
-      } else if (msg.type === 'pet_pair') {
+      } else if (msg.type === "pet_pair") {
         prompt += `Friend: ${msg.content}\n`;
       }
     }

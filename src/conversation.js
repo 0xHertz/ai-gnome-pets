@@ -76,8 +76,10 @@ export class ConversationManager {
   _showInputBubble(petId) {
     console.log(`[AI Chat] _showInputBubble called for petId: ${petId}`);
     const oldInputActor = this._inputActor;
+    const oldInputField = this._inputField;
     this._inputActor = null;
     this._inputField = null;
+    this._inputFieldHint = null;
     this._currentChatPet = null;
     this._inputBubbleFollowPet = false;
 
@@ -100,7 +102,7 @@ export class ConversationManager {
     const config = this.getPetConfig(petId);
     const monitor = Main.layoutManager.primaryMonitor;
 
-    this._inputActor = new St.Widget({
+    this._inputActor = new St.BoxLayout({
       x: Math.max(10, Math.min(gnomelet._x - 150, monitor.width - 320)),
       y: gnomelet._y - 50,
       width: 280,
@@ -109,14 +111,25 @@ export class ConversationManager {
         "background-color: #ffffff; border: 3px solid #000000; border-radius: 0px;",
     });
 
-    this._inputField = new St.Entry({
+    const entry = new St.Entry({
+      text: "",
       hint_text: `跟 ${config.name} 说...`,
+      x_expand: true,
+      y_expand: true,
       style:
-        "min-width: 260px; background-color: #ffffff; border: none; padding: 4px 8px; color: #000000; font-family: monospace; font-size: 14px;",
+        "background-color: transparent; border: none; padding: 4px 8px; color: #000000; font-family: monospace; font-size: 14px;",
     });
-    this._inputField.hintMarkup = `跟 ${config.name} 说...`;
 
-    this._inputField.clutter_text.connect("activate", () => {
+    this._inputField = entry.clutter_text;
+    this._inputFieldHint = entry.get_hint_actor();
+
+    this._inputField.connect("notify::text", () => {
+      if (this._inputFieldHint) {
+        this._inputFieldHint.opacity = this._inputField.text ? 0 : 255;
+      }
+    });
+
+    this._inputField.connect("activate", () => {
       console.log(
         `[AI Chat] Activate event fired, isProcessing: ${this._isProcessingMessage}`,
       );
@@ -136,7 +149,7 @@ export class ConversationManager {
       }
     });
 
-    this._inputActor.add_child(this._inputField);
+    this._inputActor.add_child(entry);
     Main.uiGroup.add_child(this._inputActor);
 
     this._inputField.grab_key_focus();
@@ -161,6 +174,7 @@ export class ConversationManager {
     const oldInputActor = this._inputActor;
     this._inputActor = null;
     this._inputField = null;
+    this._inputFieldHint = null;
     this._currentChatPet = null;
     this._inputBubbleFollowPet = false;
 
@@ -265,9 +279,9 @@ export class ConversationManager {
     gnomelet.stopChatting();
 
     // 保存记忆
-    this._petConfigManager.addMemory(petId, 'owner', message);
+    this._petConfigManager.addMemory(petId, "owner", message);
     if (result.success) {
-      this._petConfigManager.addMemory(petId, 'owner', result.response);
+      this._petConfigManager.addMemory(petId, "owner", result.response);
     }
   }
 
@@ -311,8 +325,8 @@ export class ConversationManager {
       );
 
       // 保存记忆（主人参与的对话，只保存到pet1）
-      this._petConfigManager.addMemory(pet1, 'owner', message);
-      this._petConfigManager.addMemory(pet1, 'owner', result.response);
+      this._petConfigManager.addMemory(pet1, "owner", message);
+      this._petConfigManager.addMemory(pet1, "owner", result.response);
     }
 
     await this._delay(3000);
@@ -396,14 +410,14 @@ export class ConversationManager {
     if (!this._isEnabled) return;
 
     if (this._activePetPair !== null) {
-      console.log('[AI Chat] Pet chat already in progress, skip');
+      console.log("[AI Chat] Pet chat already in progress, skip");
       return;
     }
 
     const gnomelets = this._petManager._gnomelets;
     for (const g of gnomelets) {
       if (g.isChatting()) {
-        console.log('[AI Chat] Some pet is chatting with owner, skip');
+        console.log("[AI Chat] Some pet is chatting with owner, skip");
         return;
       }
     }
@@ -473,9 +487,19 @@ export class ConversationManager {
 
     // 保存宠物对话记忆（双方都保存）
     for (const msg of chatHistory) {
-      if (msg.role === 'assistant') {
-        this._petConfigManager.addMemory(pet1Id, 'pet_pair', msg.content, pet2Id);
-        this._petConfigManager.addMemory(pet2Id, 'pet_pair', msg.content, pet1Id);
+      if (msg.role === "assistant") {
+        this._petConfigManager.addMemory(
+          pet1Id,
+          "pet_pair",
+          msg.content,
+          pet2Id,
+        );
+        this._petConfigManager.addMemory(
+          pet2Id,
+          "pet_pair",
+          msg.content,
+          pet1Id,
+        );
       }
     }
 

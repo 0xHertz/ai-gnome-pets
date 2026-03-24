@@ -95,9 +95,11 @@ export const Gnomelet = GObject.registerClass(
     }
 
     _setupTooltip() {
-      this.actor.connect('notify::hover', () => {
-        const config = this._conversationManager ? this._conversationManager.getPetConfig(this._petId) : null;
-        const name = config?.name || this._typeName || 'Pet';
+      this.actor.connect("notify::hover", () => {
+        const config = this._conversationManager
+          ? this._conversationManager.getPetConfig(this._petId)
+          : null;
+        const name = config?.name || this._typeName || "Pet";
         if (this.actor.hover) {
           this.actor.set_tooltip_text(name);
         }
@@ -244,7 +246,9 @@ export const Gnomelet = GObject.registerClass(
 
     _onDoubleClick() {
       if (this._conversationManager && this._conversationManager.isEnabled()) {
-        const isCurrentChat = this._conversationManager.isCurrentChatPet(this._petId);
+        const isCurrentChat = this._conversationManager.isCurrentChatPet(
+          this._petId,
+        );
         if (isCurrentChat) {
           this._conversationManager.closeCurrentChat();
         } else {
@@ -294,13 +298,40 @@ export const Gnomelet = GObject.registerClass(
       return this._state === State.CHATTING;
     }
 
+    _getPetName() {
+      if (this._conversationManager && this._petId) {
+        const config = this._conversationManager.getPetConfig(this._petId);
+        return config?.name || this._typeName || "Pet";
+      }
+      return this._typeName || "Pet";
+    }
+
+    _getPetNameColor() {
+      const colors = [
+        "#FF6B6B",
+        "#4ECDC4",
+        "#45B7D1",
+        "#96CEB4",
+        "#FFEAA7",
+        "#DDA0DD",
+        "#98D8C8",
+        "#F7DC6F",
+      ];
+      const hash = (this._petId || this._typeName || "default")
+        .split("")
+        .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      return colors[hash % colors.length];
+    }
+
     showLoadingBubble() {
       this._hideBubble();
 
       const bubbleWidth = 80;
-      const dots = ['.', '..', '...'];
+      const dots = [".", "..", "..."];
       let dotIndex = 0;
-      const borderColor = this._isPairChat ? '#4a90d9' : '#000000';
+      const borderColor = this._isPairChat ? "#4a90d9" : "#000000";
+      const petName = this._getPetName();
+      const nameColor = this._getPetNameColor();
 
       this._bubbleActor = new St.Widget({
         style: `background-color: #ffffff;
@@ -312,27 +343,43 @@ export const Gnomelet = GObject.registerClass(
                         font-family: monospace;`,
       });
 
+      // this._nameLabel = new St.Label({
+      //   text: petName,
+      //   style: `color: ${nameColor}; font-weight: bold; font-size: 14px; font-family: monospace;margin-left: 4px;`,
+      // });
+
       this._bubbleLabel = new St.Label({
-        text: '思考中.',
+        text: ".",
         style: `color: #000000; font-family: monospace;`,
       });
-      this._bubbleActor.add_child(this._bubbleLabel);
+
+      this._bubbleContent = new St.BoxLayout({
+        vertical: true,
+        style: "spacing: 2px;",
+      });
+      // this._bubbleContent.add_child(this._nameLabel);
+      this._bubbleContent.add_child(this._bubbleLabel);
+      this._bubbleActor.add_child(this._bubbleContent);
 
       this._bubbleContainer = new St.Widget({
         x: this._x + (this._displayW - bubbleWidth) / 2,
-        y: this._y - 45,
+        y: this._y - 55,
         width: bubbleWidth,
-        height: 40,
+        height: 50,
       });
       this._bubbleContainer.add_child(this._bubbleActor);
 
       Main.uiGroup.add_child(this._bubbleContainer);
 
-      this._loadingInterval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
-        dotIndex = (dotIndex + 1) % 3;
-        this._bubbleLabel.set_text('思考中' + dots[dotIndex]);
-        return GLib.SOURCE_CONTINUE;
-      });
+      this._loadingInterval = GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT,
+        500,
+        () => {
+          dotIndex = (dotIndex + 1) % 3;
+          this._bubbleLabel.set_text("." + dots[dotIndex]);
+          return GLib.SOURCE_CONTINUE;
+        },
+      );
     }
 
     updateLoadingBubblePosition() {
@@ -340,7 +387,7 @@ export const Gnomelet = GObject.registerClass(
         const bubbleWidth = 80;
         this._bubbleContainer.set_position(
           this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 45,
+          this._y - 55,
         );
       }
     }
@@ -353,8 +400,10 @@ export const Gnomelet = GObject.registerClass(
         this._loadingInterval = null;
       }
 
-      const bubbleWidth = Math.min(200, this._displayW * 2);
-      const borderColor = this._isPairChat ? '#4a90d9' : '#000000';
+      const bubbleWidth = Math.max(150, Math.min(300, this._displayW * 2));
+      const borderColor = this._isPairChat ? "#4a90d9" : "#000000";
+      const petName = this._getPetName();
+      const nameColor = this._getPetNameColor();
 
       this._bubbleActor = new St.Widget({
         style: `background-color: #ffffff;
@@ -366,17 +415,29 @@ export const Gnomelet = GObject.registerClass(
                         font-family: monospace;`,
       });
 
+      this._nameLabel = new St.Label({
+        text: petName + ":",
+        style: `color: ${nameColor}; font-weight: bold; font-size: 14px; font-family: monospace; margin-left: 4px;`,
+      });
+
       const label = new St.Label({
         text: message,
-        style: `color: #000000; font-family: monospace;`,
+        style: `color: #000000; font-family: monospace; font-size: 14px;`,
       });
-      this._bubbleActor.add_child(label);
+
+      this._bubbleContent = new St.BoxLayout({
+        vertical: true,
+        style: "spacing: 2px;",
+      });
+      this._bubbleContent.add_child(this._nameLabel);
+      this._bubbleContent.add_child(label);
+      this._bubbleActor.add_child(this._bubbleContent);
 
       this._bubbleContainer = new St.Widget({
         x: this._x + (this._displayW - bubbleWidth) / 2,
-        y: this._y - 45,
+        y: this._y - 55,
         width: bubbleWidth,
-        height: 45,
+        height: 55,
       });
       this._bubbleContainer.add_child(this._bubbleActor);
 
@@ -414,7 +475,7 @@ export const Gnomelet = GObject.registerClass(
         const bubbleWidth = this._bubbleContainer.width;
         this._bubbleContainer.set_position(
           this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 40,
+          this._y - 55,
         );
       }
 
@@ -422,7 +483,7 @@ export const Gnomelet = GObject.registerClass(
         const bubbleWidth = 80;
         this._bubbleContainer.set_position(
           this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 45,
+          this._y - 55,
         );
       }
 
