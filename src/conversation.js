@@ -51,30 +51,22 @@ export class ConversationManager {
   setPetConfig(petId, config) {
     this._petConfigManager.setPetConfig(petId, config);
   }
-
   initPet(petId, typeName) {
-    console.log(
-      `[AI Chat] initPet called - petId: ${petId}, typeName: ${typeName}`,
-    );
     if (!this._conversationHistory[petId]) {
       this._conversationHistory[petId] = [];
     }
     const config = this.getPetConfig(petId);
-    console.log(`[AI Chat] initPet - current config:`, config);
     if (!config.typeName) {
       config.typeName = typeName;
       this.setPetConfig(petId, config);
-      console.log(`[AI Chat] initPet - set typeName to: ${typeName}`);
     }
   }
-
   triggerChat(petId) {
     this._currentChatPet = petId;
     this._showInputBubble(petId);
   }
 
   _showInputBubble(petId) {
-    console.log(`[AI Chat] _showInputBubble called for petId: ${petId}`);
     const oldInputActor = this._inputActor;
     const oldInputField = this._inputField;
     this._inputActor = null;
@@ -91,13 +83,11 @@ export class ConversationManager {
     }
 
     const gnomelet = this._findGnomeletByPetId(petId);
-    console.log(`[AI Chat] Found gnomelet: ${gnomelet ? "yes" : "no"}`);
     if (!gnomelet) return;
 
     gnomelet.startChatting();
     this._currentChatPet = petId;
     this._inputBubbleFollowPet = true;
-    console.log(`[AI Chat] Started chatting with pet: ${petId}`);
 
     const config = this.getPetConfig(petId);
     const monitor = Main.layoutManager.primaryMonitor;
@@ -130,18 +120,13 @@ export class ConversationManager {
     });
 
     this._inputField.connect("activate", () => {
-      console.log(
-        `[AI Chat] Activate event fired, isProcessing: ${this._isProcessingMessage}`,
-      );
       if (this._isProcessingMessage) return;
 
       const text = this._inputField.get_text();
-      console.log(`[AI Chat] Input text: "${text}"`);
       if (text && text.trim().length > 0) {
         const message = text.trim();
         this._inputField.set_text("");
         this._isProcessingMessage = true;
-        console.log(`[AI Chat] Calling _handleOwnerMessage with: "${message}"`);
         this._handleOwnerMessage(message).catch((e) => {
           console.error("Chat error:", e);
           this._isProcessingMessage = false;
@@ -153,7 +138,6 @@ export class ConversationManager {
     Main.uiGroup.add_child(this._inputActor);
 
     this._inputField.grab_key_focus();
-    console.log(`[AI Chat] Input bubble shown successfully`);
   }
 
   isCurrentChatPet(petId) {
@@ -215,70 +199,47 @@ export class ConversationManager {
   }
 
   async _handleOwnerMessage(message) {
-    console.log(`[AI Chat] _handleOwnerMessage called with: "${message}"`);
     const petId = this._currentChatPet;
-    console.log(`[AI Chat] Current chat pet: ${petId}`);
     if (!petId) {
-      console.log(`[AI Chat] No current chat pet, returning`);
       return;
     }
 
-    console.log(`[AI Chat] Closing input bubble...`);
     this._closeInputBubble();
-    console.log(`[AI Chat] Input bubble closed`);
 
     if (this._activePetPair) {
-      console.log(
-        `[AI Chat] Active pet pair detected, calling _handleOwnerInPetChat`,
-      );
       await this._handleOwnerInPetChat(message);
     } else {
-      console.log(
-        `[AI Chat] No active pet pair, calling _handleOwnerToPetChat`,
-      );
       await this._handleOwnerToPetChat(petId, message);
     }
 
-    console.log(`[AI Chat] Message handling complete`);
     this._isProcessingMessage = false;
   }
 
   async _handleOwnerToPetChat(petId, message) {
-    console.log(`[AI Chat] _handleOwnerToPetChat called`);
     const gnomelet = this._findGnomeletByPetId(petId);
 
     if (!gnomelet) {
-      console.log(`[AI Chat] Gnomelet not found for petId: ${petId}`);
       return;
     }
 
-    console.log(`[AI Chat] Showing owner bubble...`);
     gnomelet.startChatting();
     gnomelet.showBubble(message, true);
 
-    console.log(`[AI Chat] Waiting 1500ms before AI call...`);
     await this._delay(1500);
 
-    console.log(`[AI Chat] Calling AI service...`);
     gnomelet.showLoadingBubble();
 
     const result = await this.sendMessage(petId, message);
-    console.log(`[AI Chat] AI result:`, result);
 
     if (result.success) {
-      console.log(`[AI Chat] Showing pet response bubble...`);
       gnomelet.showBubble(result.response, false);
     } else {
-      console.log(`[AI Chat] AI error: ${result.error}`);
       gnomelet.showBubble(`错误: ${result.error}`, false);
     }
 
-    console.log(`[AI Chat] Waiting 3000ms before stopping...`);
     await this._delay(3000);
-    console.log(`[AI Chat] Stopping chat, restoring pet state`);
     gnomelet.stopChatting();
 
-    // 保存记忆
     this._petConfigManager.addMemory(petId, "owner", message);
     if (result.success) {
       this._petConfigManager.addMemory(petId, "owner", result.response);
@@ -358,18 +319,13 @@ export class ConversationManager {
   }
 
   async sendMessage(petId, message) {
-    console.log(
-      `[AI Chat] sendMessage called - petId: ${petId}, message: "${message}"`,
-    );
     const config = this.getPetConfig(petId);
-    console.log(`[AI Chat] Pet config:`, config);
 
     const systemPrompt = buildSystemPrompt(
       config,
       config.name,
       config.typeName,
     );
-    console.log(`[AI Chat] System prompt built`);
 
     if (!this._conversationHistory[petId]) {
       this._conversationHistory[petId] = [];
@@ -378,7 +334,6 @@ export class ConversationManager {
       this._conversationHistory[petId],
       message,
     );
-    console.log(`[AI Chat] Context built, calling AI service...`);
 
     try {
       const result = await this._aiService.chat(
@@ -386,7 +341,6 @@ export class ConversationManager {
         systemPrompt,
         config.name,
       );
-      console.log(`[AI Chat] AI service returned:`, result);
 
       if (result.success) {
         this._conversationHistory[petId].push({
@@ -410,14 +364,12 @@ export class ConversationManager {
     if (!this._isEnabled) return;
 
     if (this._activePetPair !== null) {
-      console.log("[AI Chat] Pet chat already in progress, skip");
       return;
     }
 
     const gnomelets = this._petManager._gnomelets;
     for (const g of gnomelets) {
       if (g.isChatting()) {
-        console.log("[AI Chat] Some pet is chatting with owner, skip");
         return;
       }
     }
