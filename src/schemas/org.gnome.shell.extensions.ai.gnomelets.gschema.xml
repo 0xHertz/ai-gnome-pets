@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="gnomelets">
+  <schema id="org.gnome.shell.extensions.ai.gnomelets" path="/org/gnome/shell/extensions/ai/gnomelets/">
+    <key name="floor-z-order" type="s">
+      <choices>
+        <choice value="allow"/>
+        <choice value="partial"/>
+        <choice value="disallow"/>
+      </choices>
+      <default>'allow'</default>
+      <summary>In Front of Maximized</summary>
+      <description>
+        Mode: 
+        'allow' - Always in front (Overlay).
+        'partial' - Behind if the focused window is maximized.
+        'disallow' - Behind if any visible window is maximized.
+      </description>
+    </key>
+    <key name="dock-z-order" type="b">
+      <default>false</default>
+      <summary>In Front of Dock</summary>
+      <description>
+        If true, gnomelets are drawn in front of the dock of "Dash to Dock" or Panel of "Dash to Panel".
+        If false, they are drawn behind.
+      </description>
+    </key>
+    <key name="dock-support" type="s">
+      <choices>
+        <choice value="none"/>
+        <choice value="dash-to-dock"/>
+        <choice value="dash-to-panel"/>
+      </choices>
+      <default>'none'</default>
+      <summary>Dock Support</summary>
+      <description>
+        Which extension to support for dock interaction.
+      </description>
+    </key>
+    <key name="gnomelet-type" type="as">
+      <default>['Santa']</default>
+      <summary>Gnomelet Characters</summary>
+      <description>The kinds of gnomelet to display. If multiple are selected, they will be chosen randomly.</description>
+    </key>
+    <key name="gnomelet-count" type="i">
+      <default>5</default>
+      <summary>Number of Gnomelets</summary>
+      <description>The number of gnomelets to spawn.</description>
+    </key>
+    <key name="gnomelet-scale" type="i">
+      <default>64</default>
+      <summary>Gnomelet Scale</summary>
+      <description>The target height of the gnomelet in pixels.</description>
+    </key>
+    <key name="reset-trigger" type="b">
+      <default>false</default>
+      <summary>Reset Trigger</summary>
+      <description>Toggle this to respawn all gnomelets.</description>
+    </key>
+    <key name="is-enabled" type="b">
+      <default>true</default>
+      <summary>Is Enabled</summary>
+      <description>Whether the gnomelets are visible/active.</description>
+    </key>
+    <key name="show-indicator" type="b">
+      <default>true</default>
+      <summary>Show Indicator</summary>
+      <description>Whether to show the indicator in the top panel.</description>
+    </key>
+    <key name="allow-interaction" type="b">
+      <default>false</default>
+      <summary>Allow Interaction</summary>
+      <description>If true, gnomelets can be dragged with the mouse.</description>
+    </key>
+    <key name="jump-power" type="i">
+      <default>20</default>
+      <summary>Jump Power</summary>
+      <description>The vertical force of the jump.</description>
+    </key>
+    <key name="ai-enabled" type="b">
+      <default>false</default>
+      <summary>Enable AI</summary>
+      <description>Whether to enable AI-powered conversations.</description>
+    </key>
+    <key name="ai-provider" type="s">
+      <default>'openai'</default>
+      <summary>AI Provider</summary>
+      <description>The AI service provider (openai, anthropic, etc.).</description>
+    </key>
+    <key name="ai-api-key" type="s">
+      <default>''</default>
+      <summary>AI API Key</summary>
+      <description>API key for the AI service.</description>
+    </key>
+    <key name="ai-model" type="s">
+      <default>'gpt-3.5-turbo'</default>
+      <summary>AI Model</summary>
+      <description>The AI model to use.</description>
+    </key>
+    <key name="ai-base-url" type="s">
+      <default>''</default>
+      <summary>API Base URL</summary>
+      <description>Custom API base URL for compatible services (e.g., http://localhost:11434 for Ollama).</description>
+    </key>
+    <key name="pet-configs" type="s">
+      <default>'{}'</default>
+      <summary>Pet Configurations</summary>
+      <description>JSON string of per-pet AI configurations.</description>
+    </key>
+  </schema>
+</schemalist>

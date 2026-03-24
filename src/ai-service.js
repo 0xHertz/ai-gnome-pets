@@ -1,0 +1,410 @@
+import GLib from "gi://GLib";
+import Soup from "gi://Soup";
+
+export class AIService {
+  constructor(settings) {
+    this._settings = settings;
+    this._apiKeys = {};
+  }
+
+  _getApiKey() {
+    return this._settings.get_string("ai-api-key");
+  }
+
+  async chat(prompt, systemPrompt, petName) {
+    const provider = this._settings.get_string("ai-provider");
+    const model = this._settings.get_string("ai-model");
+    const apiKey = this._getApiKey();
+    const baseUrl = this._settings.get_string("ai-base-url") || "";
+
+    console.log(`[AI Service] chat() called`);
+    console.log(`[AI Service] Provider: ${provider}`);
+    console.log(`[AI Service] Model: ${model}`);
+    console.log(
+      `[AI Service] API Key: ${apiKey ? "***" + apiKey.slice(-4) : "empty"}`,
+    );
+    console.log(`[AI Service] Base URL: ${baseUrl || "(default)"}`);
+    console.log(`[AI Service] Prompt: "${prompt.substring(0, 50)}..."`);
+
+    if (!apiKey) {
+      console.log(`[AI Service] No API key!`);
+      return { success: false, error: "No API key configured" };
+    }
+
+    try {
+      let response;
+
+      if (provider === "openai") {
+        response = await this._openaiCompatibleChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          "https://api.openai.com/v1",
+        );
+      } else if (provider === "anthropic") {
+        response = await this._anthropicChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+        );
+      } else if (provider === "google") {
+        response = await this._googleChat(apiKey, model, systemPrompt, prompt);
+      } else if (provider === "custom") {
+        if (!baseUrl) {
+          return {
+            success: false,
+            error: "Custom provider requires API base URL",
+          };
+        }
+        response = await this._openaiCompatibleChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          baseUrl,
+        );
+      } else if (provider === "ollama") {
+        const ollamaUrl = baseUrl || "http://localhost:11434";
+        response = await this._ollamaChat(
+          ollamaUrl,
+          model,
+          systemPrompt,
+          prompt,
+        );
+      } else if (provider === "lmstudio") {
+        const lmstudioUrl = baseUrl || "http://localhost:1234/v1";
+        response = await this._openaiCompatibleChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          lmstudioUrl,
+        );
+      } else if (provider === "azure") {
+        const azureUrl = baseUrl || "";
+        if (!azureUrl) {
+          return {
+            success: false,
+            error: "Azure OpenAI requires API base URL",
+          };
+        }
+        response = await this._azureChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          azureUrl,
+        );
+      } else {
+        return { success: false, error: `Unknown provider: ${provider}` };
+      }
+      return { success: true, response };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  async _openaiCompatibleChat(
+    apiKey,
+    model,
+    systemPrompt,
+    userPrompt,
+    baseUrl,
+  ) {
+    const url = `${baseUrl}/chat/completions`;
+    const body = JSON.stringify({
+      model: model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.8,
+      max_tokens: 200,
+    });
+
+    const response = await this._makeRequest(url, "POST", body, {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    });
+
+    const data = JSON.parse(new TextDecoder().decode(response));
+    if (data.choices && data.choices[0]) {
+      return data.choices[0].message.content;
+    }
+    throw new Error("Invalid response format");
+  }
+
+  async _anthropicChat(apiKey, model, systemPrompt, userPrompt) {
+    const url = "https://api.anthropic.com/v1/messages";
+    const body = JSON.stringify({
+      model: model,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+      temperature: 0.8,
+      max_tokens: 200,
+    });
+
+    const response = await this._makeRequest(url, "POST", body, {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    });
+
+    const data = JSON.parse(new TextDecoder().decode(response));
+    if (data.content && data.content[0]) {
+      return data.content[0].text;
+    }
+    throw new Error("Invalid response format");
+  }
+
+  async _googleChat(apiKey, model, systemPrompt, userPrompt) {
+    const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { temperature: 0.8, maxOutputTokens: 200 },
+    });
+
+    const response = await this._makeRequest(url, "POST", body, {
+      "Content-Type": "application/json",
+    });
+
+    const data = JSON.parse(new TextDecoder().decode(response));
+    if (data.candidates && data.candidates[0]) {
+      return data.candidates[0].content.parts[0].text;
+    }
+    throw new Error("Invalid response format");
+  }
+
+  async _ollamaChat(baseUrl, model, systemPrompt, userPrompt) {
+    const url = `${baseUrl}/api/chat`;
+    const body = JSON.stringify({
+      model: model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      stream: false,
+    });
+
+    const response = await this._makeRequest(url, "POST", body, {
+      "Content-Type": "application/json",
+    });
+
+    const data = JSON.parse(new TextDecoder().decode(response));
+    if (data.message && data.message.content) {
+      return data.message.content;
+    }
+    throw new Error("Invalid response format");
+  }
+
+  async _azureChat(apiKey, model, systemPrompt, userPrompt, baseUrl) {
+    const url = `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=2024-02-01`;
+    const body = JSON.stringify({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.8,
+      max_tokens: 200,
+    });
+
+    const response = await this._makeRequest(url, "POST", body, {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+    });
+
+    const data = JSON.parse(new TextDecoder().decode(response));
+    if (data.choices && data.choices[0]) {
+      return data.choices[0].message.content;
+    }
+    throw new Error("Invalid response format");
+  }
+
+  async _makeRequest(url, method, body, headers) {
+    console.log(`[AI Service] _makeRequest: ${method} ${url}`);
+    return new Promise((resolve, reject) => {
+      const session = new Soup.Session();
+      console.log(`[AI Service] Creating message with URI: ${url}`);
+      const message = new Soup.Message({
+        method: method,
+        uri: GLib.Uri.parse(url, GLib.UriFlags.NONE),
+      });
+
+      for (const [key, value] of Object.entries(headers)) {
+        message.request_headers.append(key, value);
+      }
+
+      if (body) {
+        const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
+        const bytes = new GLib.Bytes(new TextEncoder().encode(bodyStr));
+        message.set_request_body_from_bytes("application/json", bytes);
+      }
+
+      // For libsoup3, use send_and_read_async
+      console.log(`[AI Service] Sending request...`);
+      session.send_and_read_async(
+        message,
+        GLib.PRIORITY_DEFAULT,
+        null,
+        (sess, res) => {
+          console.log(
+            `[AI Service] Request callback, status: ${message.status_code}`,
+          );
+          try {
+            const bytes = session.send_and_read_finish(res);
+            console.log(`[AI Service] Got response bytes`);
+            if (message.status_code >= 400) {
+              reject(
+                new Error(
+                  `HTTP ${message.status_code}: ${message.reason_phrase}`,
+                ),
+              );
+              return;
+            }
+            resolve(bytes.get_data());
+          } catch (e) {
+            console.error(`[AI Service] Error in request callback:`, e);
+            reject(e);
+          }
+        },
+      );
+    });
+  }
+
+  setApiKey(key) {
+    this._apiKeys["default"] = key;
+  }
+
+  async testConnection() {
+    return await this.testChat(
+      "Hello",
+      "You are a helpful assistant. Reply with just 'Hi!'",
+    );
+  }
+
+  async testChat(prompt, systemPrompt) {
+    const provider = this._settings.get_string("ai-provider");
+    const model = this._settings.get_string("ai-model");
+    const apiKey = this._settings.get_string("ai-api-key");
+    const baseUrl = this._settings.get_string("ai-base-url") || "";
+
+    if (!apiKey && provider !== "ollama") {
+      return { success: false, error: "No API key configured" };
+    }
+
+    try {
+      let response;
+      if (provider === "openai") {
+        response = await this._openaiCompatibleChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          "https://api.openai.com/v1",
+        );
+      } else if (provider === "anthropic") {
+        response = await this._anthropicChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+        );
+      } else if (provider === "google") {
+        response = await this._googleChat(apiKey, model, systemPrompt, prompt);
+      } else if (provider === "custom") {
+        if (!baseUrl) {
+          return {
+            success: false,
+            error: "Custom provider requires API base URL",
+          };
+        }
+        response = await this._openaiCompatibleChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          baseUrl,
+        );
+      } else if (provider === "ollama") {
+        const ollamaUrl = baseUrl || "http://localhost:11434";
+        response = await this._ollamaChat(
+          ollamaUrl,
+          model,
+          systemPrompt,
+          prompt,
+        );
+      } else if (provider === "lmstudio") {
+        const lmstudioUrl = baseUrl || "http://localhost:1234/v1";
+        response = await this._openaiCompatibleChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          lmstudioUrl,
+        );
+      } else if (provider === "azure") {
+        if (!baseUrl) {
+          return {
+            success: false,
+            error: "Azure OpenAI requires API base URL",
+          };
+        }
+        response = await this._azureChat(
+          apiKey,
+          model,
+          systemPrompt,
+          prompt,
+          baseUrl,
+        );
+      } else {
+        return { success: false, error: `Unknown provider: ${provider}` };
+      }
+      return { success: true, response };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+}
+
+export function buildSystemPrompt(petConfig, petName, typeName) {
+  const personality = petConfig?.personality || "friendly and playful";
+  const background = petConfig?.background || "";
+  const speakingStyle = petConfig?.speakingStyle || "short and cute";
+  const memory = petConfig?.memory || [];
+
+  let prompt = `You are ${petName}, a ${typeName.toLowerCase()} living on a computer desktop. `;
+  prompt += `Your personality: ${personality}. `;
+  prompt += `Speak in a ${speakingStyle} manner. `;
+  prompt += `Use emojis and ASCII art to enhance your responses. `;
+  prompt += `Answer in Chinese `;
+  if (background) {
+    prompt += `Background: ${background}. `;
+  }
+
+  // 添加记忆上下文
+  if (memory.length > 0) {
+    prompt += `\n\nRecent memories of conversations:\n`;
+    for (const msg of memory) {
+      if (msg.type === 'owner') {
+        prompt += `User: ${msg.content}\n`;
+      } else if (msg.type === 'pet_pair') {
+        prompt += `Friend: ${msg.content}\n`;
+      }
+    }
+  }
+
+  prompt +=
+    "Respond to conversations in a natural, engaging way. Keep responses concise (1-3 sentences). ";
+  return prompt;
+}
+
+export function buildContextMessage(conversationHistory, currentMessage) {
+  let context = "";
+  for (const msg of conversationHistory.slice(-5)) {
+    context += `${msg.role === "user" ? "User" : "Pet"}: ${msg.content}\n`;
+  }
+  return context + `User: ${currentMessage}`;
+}
