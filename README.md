@@ -55,6 +55,15 @@ Gnomelets now feature **AI-powered conversations**! Your desktop companions can 
 *   **Manual Trigger**: Use the menu "Trigger Pet Chat" button to force a conversation regardless of score
 *   **Auto-Trigger**: After each pet conversation completes, the system automatically schedules the next check after cooldown period
 *   **Clear Memories**: Clear all pet conversation memories from the settings page
+*   **Chat History**: View all pet-to-pet conversations in the settings page
+*   **Relationship Score**: Pets develop relationships based on interaction frequency:
+    *   First conversation: +3 points
+    *   Conversations 2-5: +2 points each
+    *   Conversations 6-10: +1 point each
+    *   10+ conversations: +0.5 points each
+    *   Maximum: 40 points
+    *   Decay over time: -1 to -15 points based on days since last chat
+    *   Relationship levels: Stranger (0-5) → Acquaintance (6-10) → Nodding (11-20) → Friend (21-30) → Close Friend (31-40) → Best Friend (41+)
 
 ### Quick Start
 
