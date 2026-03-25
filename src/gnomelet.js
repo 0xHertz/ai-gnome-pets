@@ -271,10 +271,8 @@ export const Gnomelet = GObject.registerClass(
         this._savedVx = this._vx;
         this._savedVy = this._vy;
         this._state = State.CHATTING;
-        this._vx = 0;
-        this._vy = 0;
-        this._frame = 4; // Idle frame
         this._isPairChat = isPairChat;
+        this._updateAnimation();
       }
     }
 
@@ -287,6 +285,7 @@ export const Gnomelet = GObject.registerClass(
         this._savedVx = null;
         this._savedVy = null;
         this._isPairChat = false;
+        this._updateAnimation();
       }
     }
 
@@ -702,8 +701,6 @@ export const Gnomelet = GObject.registerClass(
 
       // Chatting state - pet sits still
       if (this._state === State.CHATTING) {
-        this._vx = 0;
-        this._vy = 0;
         this._updateAnimation();
         return;
       }
@@ -1118,6 +1115,9 @@ export const Gnomelet = GObject.registerClass(
           let dIdx =
             Math.floor(this._animationTimer / dragSpeed) % dragFrames.length;
           frameIndex = dragFrames[dIdx];
+          break;
+        case State.CHATTING:
+          frameIndex = 4;
           break;
       }
       this.setFrame(frameIndex);
