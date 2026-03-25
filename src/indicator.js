@@ -51,7 +51,7 @@ export const GnomeletIndicator = GObject.registerClass(
             if (this._conversationManager && this._conversationManager.isEnabled()) {
                 const interactItem = new PopupMenu.PopupMenuItem('🐾 Trigger Pet Chat');
                 interactItem.connectObject('activate', () => {
-                    this._conversationManager.triggerPetInteraction();
+                    this._conversationManager.triggerPetInteractionNow();
                 }, this);
                 this.menu.addMenuItem(interactItem);
 

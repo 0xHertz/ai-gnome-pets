@@ -278,6 +278,34 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
     respawnRow.add_suffix(respawnButton);
     actionsGroup.add(respawnRow);
 
+    const clearMemoryRow = new Adw.ActionRow({ title: "Clear All Pet Memories" });
+    const clearMemoryButton = new Gtk.Button({
+      label: "Clear Memories",
+      valign: Gtk.Align.CENTER,
+    });
+
+    clearMemoryButton.connect("clicked", () => {
+      try {
+        const configs = JSON.parse(settings.get_string("pet-configs") || "{}");
+        for (const petId in configs) {
+          if (configs[petId].memory) {
+            configs[petId].memory = [];
+          }
+        }
+        settings.set_string("pet-configs", JSON.stringify(configs));
+        
+        clearMemoryButton.label = "Cleared!";
+        setTimeout(() => {
+          clearMemoryButton.label = "Clear Memories";
+        }, 1500);
+      } catch (e) {
+        console.error("Failed to clear memories:", e);
+      }
+    });
+
+    clearMemoryRow.add_suffix(clearMemoryButton);
+    actionsGroup.add(clearMemoryRow);
+
     this._buildAIPreferences(page, settings);
 
     window.add(page);

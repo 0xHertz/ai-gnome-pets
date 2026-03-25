@@ -40,9 +40,21 @@ Gnomelets now feature **AI-powered conversations**! Your desktop companions can 
     *   **Personality**: Set how your pet behaves (friendly, playful, shy, etc.)
     *   **Background**: Give your pet a unique backstory
     *   **Speaking Style**: Configure how they talk (cute, formal, casual, etc.)
-*   **Conversation Memory**: Pets remember recent conversations and can reference them in chats
-*   **Pet-to-Pet Chat**: Enable two gnomelets to have conversations with each other! They can discuss topics, play games, or just hang out
-*   **Spontaneous Interactions**: When AI is enabled, gnomelets may occasionally trigger random conversations or interactions on their own
+*   **Conversation Memory**: Pets remember recent conversations and can reference them in future chats
+*   **Pet-to-Pet Chat**: Two gnomelets can have conversations with each other! They can discuss topics, play games, or just hang out
+*   **Memory-Based Dialog**: When pets talk to each other, their conversations are based on shared memories:
+    *   If they have previous conversations, they reference past topics ("Hey, how's that thing going?")
+    *   If they only have owner conversations, they can start topics based on what they learned from you
+    *   If they have no memory, they just say hello like before
+*   **Smart Trigger System**: Pet-to-pet conversations are triggered intelligently:
+    *   **Multi-factor scoring**: Trigger score = memory score (0-40) + proximity score (5-30) + idle score (0-20) + random factor (0-10)
+    *   **Memory score**: Has pet_pair memory = 40pts, has owner memory = 20pts, no memory = 0pts
+    *   **Proximity score**: Distance <150px = 30pts, <300px = 25pts, <500px = 20pts, <800px = 15pts, <1200px = 10pts, ≥1200px = 5pts
+    *   **Idle score**: Both idle = 20pts, one idle = 10pts, both moving = 0pts
+    *   **Threshold**: Triggers when score ≥ 50 OR distance < 500px
+*   **Manual Trigger**: Use the menu "Trigger Pet Chat" button to force a conversation regardless of score
+*   **Auto-Trigger**: After each pet conversation completes, the system automatically schedules the next check after cooldown period
+*   **Clear Memories**: Clear all pet conversation memories from the settings page
 
 ### Quick Start
 

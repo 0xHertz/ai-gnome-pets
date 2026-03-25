@@ -26,6 +26,11 @@ export class ConversationManager {
     this._ownerParticipating = false;
     this._inputBubbleFollowPet = true;
     this._isProcessingMessage = false;
+    this._lastPetInteractionTime = {};
+    this._minCooldownMs = 2 * 60 * 1000;
+    this._maxCooldownMs = 4 * 60 * 1000;
+    this._nextCheckTime = 0;
+    this._autoTriggerTimeout = null;
 
     this._settings.connectObject(
       "changed",
@@ -283,6 +288,8 @@ export class ConversationManager {
         result.response,
         gnomelet2,
         chatHistory,
+        null,
+        null,
       );
 
       // 保存记忆（主人参与的对话，只保存到pet1）
@@ -295,74 +302,144 @@ export class ConversationManager {
     gnomelet2.stopChatting();
     this._activePetPair = null;
   }
-
-  async _petRespondInChat(petId, previousMessage, gnomelet, chatHistory) {
-    const config = this.getPetConfig(petId);
-    const systemPrompt = buildSystemPrompt(
-      config,
-      config.name,
-      config.typeName,
+  _calculateTriggerScore(pet1Id, pet2Id) {
+    let memoryScore = 0;
+    let proximityScore = 15;
+    let idleScore = 10;
+    let randomFactor = Math.random() * 10;
+    const config1 = this.getPetConfig(pet1Id);
+    const config2 = this.getPetConfig(pet2Id);
+    const memory1 = config1.memory || [];
+    const memory2 = config2.memory || [];
+    const petPair1 = memory1.filter(
+      (m) => m.type === "pet_pair" && m.partnerPetId === pet2Id,
     );
-    const prompt = `${config.name} responds to ${previousMessage}.`;
-
-    gnomelet.showLoadingBubble();
-    const result = await this._aiService.chat(
-      prompt,
-      systemPrompt,
-      config.name,
+    const petPair2 = memory2.filter(
+      (m) => m.type === "pet_pair" && m.partnerPetId === pet1Id,
     );
-
-    if (result.success) {
-      chatHistory.push({ role: "assistant", content: result.response });
-      gnomelet.showBubble(result.response, false);
+    const owner1 = memory1.filter((m) => m.type === "owner");
+    const owner2 = memory2.filter((m) => m.type === "owner");
+    if (petPair1.length > 0 || petPair2.length > 0) {
+      memoryScore = 40;
+    } else if (owner1.length > 0 || owner2.length > 0) {
+      memoryScore = 20;
+    }
+    const gnomelet1 = this._findGnomeletByPetId(pet1Id);
+    const gnomelet2 = this._findGnomeletByPetId(pet2Id);
+    if (gnomelet1 && gnomelet2) {
+      const dx = Math.abs(gnomelet1._x - gnomelet2._x);
+      const dy = Math.abs(gnomelet1._y - gnomelet2._y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < 200) proximityScore = 30;
+      else if (distance < 500) proximityScore = 20;
+      else proximityScore = 10;
+      const state1 = gnomelet1._state;
+      const state2 = gnomelet2._state;
+      const State = {
+        FALLING: "falling",
+        IDLE: "idle",
+        WALKING: "walking",
+        JUMPING: "jumping",
+      };
+      const isIdle1 = state1 === State.IDLE || state1 === "idle";
+      const isIdle2 = state2 === State.IDLE || state2 === "idle";
+      if (isIdle1 && isIdle2) idleScore = 20;
+      else if (isIdle1 || isIdle2) idleScore = 10;
+      else idleScore = 0;
+    }
+    return memoryScore + proximityScore + idleScore + randomFactor;
+  }
+  _getCooldownMs(pet1Id, pet2Id) {
+    const config1 = this.getPetConfig(pet1Id);
+    const config2 = this.getPetConfig(pet2Id);
+    const memory1 = config1.memory || [];
+    const memory2 = config2.memory || [];
+    const petPair1 = memory1.filter(
+      (m) => m.type === "pet_pair" && m.partnerPetId === pet2Id,
+    );
+    const petPair2 = memory2.filter(
+      (m) => m.type === "pet_pair" && m.partnerPetId === pet1Id,
+    );
+    const owner1 = memory1.filter((m) => m.type === "owner").length;
+    const owner2 = memory2.filter((m) => m.type === "owner").length;
+    if (petPair1.length > 0 || petPair2.length > 0) {
+      return 2 * 60 * 1000 + Math.random() * 2 * 60 * 1000;
+    } else if (owner1 > 0 || owner2 > 0) {
+      return 4 * 60 * 1000 + Math.random() * 2 * 60 * 1000;
+    } else {
+      return 8 * 60 * 1000 + Math.random() * 4 * 60 * 1000;
     }
   }
-
-  async sendMessage(petId, message) {
-    const config = this.getPetConfig(petId);
-
-    const systemPrompt = buildSystemPrompt(
-      config,
-      config.name,
-      config.typeName,
-    );
-
-    if (!this._conversationHistory[petId]) {
-      this._conversationHistory[petId] = [];
-    }
-    const context = buildContextMessage(
-      this._conversationHistory[petId],
-      message,
-    );
-
-    try {
-      const result = await this._aiService.chat(
-        context,
-        systemPrompt,
-        config.name,
-      );
-
-      if (result.success) {
-        this._conversationHistory[petId].push({
-          role: "user",
-          content: message,
-        });
-        this._conversationHistory[petId].push({
-          role: "assistant",
-          content: result.response,
-        });
-        return { success: true, response: result.response };
-      }
-      return { success: false, error: result.error };
-    } catch (e) {
-      console.error(`[AI Chat] Exception in sendMessage:`, e);
-      return { success: false, error: e.message };
-    }
+  _canTriggerInteraction(pet1Id, pet2Id) {
+    const now = Date.now();
+    const pairKey = [pet1Id, pet2Id].sort().join("|");
+    const lastTime = this._lastPetInteractionTime[pairKey] || 0;
+    const cooldownMs = this._getCooldownMs(pet1Id, pet2Id);
+    return now - lastTime >= cooldownMs;
+  }
+  _recordInteractionTime(pet1Id, pet2Id) {
+    const pairKey = [pet1Id, pet2Id].sort().join("|");
+    this._lastPetInteractionTime[pairKey] = Date.now();
+    this._nextCheckTime =
+      Date.now() +
+      this._minCooldownMs +
+      Math.random() * (this._maxCooldownMs - this._minCooldownMs);
   }
 
+  _generateConversationPrompt(pet1Id, pet2Id) {
+    const config1 = this.getPetConfig(pet1Id);
+    const config2 = this.getPetConfig(pet2Id);
+    const memory1 = config1.memory || [];
+    const memory2 = config2.memory || [];
+
+    const petPair1 = memory1.filter(
+      (m) => m.type === "pet_pair" && m.partnerPetId === pet2Id,
+    );
+    const petPair2 = memory2.filter(
+      (m) => m.type === "pet_pair" && m.partnerPetId === pet1Id,
+    );
+
+    if (petPair1.length > 0 || petPair2.length > 0) {
+      const lastMessages = [...petPair1, ...petPair2]
+        .slice(-4)
+        .map((m) => m.content)
+        .join("\n");
+      return {
+        prompt: `Based on previous conversation with ${config2.name}:\n${lastMessages}\n\n${config1.name} wants to continue the conversation naturally.`,
+        hasMemory: true,
+        rounds: 3 + Math.floor(Math.random() * 2),
+      };
+    }
+
+    const owner1 = memory1.filter((m) => m.type === "owner").slice(-3);
+    const owner2 = memory2.filter((m) => m.type === "owner").slice(-3);
+
+    if (owner1.length > 0 || owner2.length > 0) {
+      const recentOwner2 = owner2.map((m) => m.content).join(" | ");
+      return {
+        prompt: `${config1.name} knows that ${config2.name} recently talked with owner about: ${recentOwner2}. ${config1.name} wants to start a conversation based on this, but doesn't mention the owner directly.`,
+        hasMemory: true,
+        rounds: 2 + Math.floor(Math.random() * 2),
+      };
+    }
+
+    return {
+      prompt: `${config1.name} sees ${config2.name} nearby and wants to say hello.`,
+      hasMemory: false,
+      rounds: 1,
+    };
+  }
   async triggerPetInteraction() {
+    console.log(`Checking for pet interaction...`);
+    const now = Date.now();
+    const cooldownMs =
+      this._minCooldownMs +
+      Math.random() * (this._maxCooldownMs - this._minCooldownMs);
+    this._scheduleAutoTrigger(cooldownMs);
+    if (now < this._nextCheckTime) {
+      return;
+    }
     if (!this._isEnabled) return;
-
     if (this._activePetPair !== null) {
       return;
     }
@@ -376,14 +453,53 @@ export class ConversationManager {
 
     const configs = this._petConfigManager.getConfigs();
     const petIds = Object.keys(configs);
-
     if (petIds.length < 2) return;
 
-    const shuffled = petIds.sort(() => Math.random() - 0.5);
-    const pet1 = shuffled[0];
-    const pet2 = shuffled[1];
+    let bestPair = null;
+    let bestScore = 0;
 
-    await this._startPetChat(pet1, pet2);
+    for (let i = 0; i < petIds.length; i++) {
+      for (let j = i + 1; j < petIds.length; j++) {
+        const pet1 = petIds[i];
+        const pet2 = petIds[j];
+
+        if (!this._canTriggerInteraction(pet1, pet2)) {
+          continue;
+        }
+
+        const score = this._calculateTriggerScore(pet1, pet2);
+        if (score > bestScore) {
+          bestScore = score;
+          bestPair = [pet1, pet2];
+        }
+      }
+    }
+
+    if (bestPair) {
+      const gnomelet1 = this._findGnomeletByPetId(bestPair[0]);
+      const gnomelet2 = this._findGnomeletByPetId(bestPair[1]);
+      let distance = 9999;
+      if (gnomelet1 && gnomelet2) {
+        const dx = Math.abs(gnomelet1._x - gnomelet2._x);
+        const dy = Math.abs(gnomelet1._y - gnomelet2._y);
+        distance = Math.sqrt(dx * dx + dy * dy);
+      }
+
+      if (bestScore >= 50 || distance < 500) {
+        this._recordInteractionTime(bestPair[0], bestPair[1]);
+        await this._startPetChat(bestPair[0], bestPair[1]);
+      } else {
+        this._nextCheckTime =
+          now +
+          this._minCooldownMs +
+          Math.random() * (this._maxCooldownMs - this._minCooldownMs);
+      }
+    } else {
+      this._nextCheckTime =
+        now +
+        this._minCooldownMs +
+        Math.random() * (this._maxCooldownMs - this._minCooldownMs);
+    }
   }
 
   async _startPetChat(pet1Id, pet2Id) {
@@ -405,7 +521,9 @@ export class ConversationManager {
       chatHistory: chatHistory,
     };
 
-    const greeting = `${config1.name} sees ${config2.name} nearby and wants to say hello.`;
+    const convInfo = this._generateConversationPrompt(pet1Id, pet2Id);
+    const { prompt, rounds } = convInfo;
+    const totalRounds = rounds;
 
     const systemPrompt1 = buildSystemPrompt(
       config1,
@@ -413,8 +531,9 @@ export class ConversationManager {
       config1.typeName,
     );
     gnomelet1.showLoadingBubble();
+    gnomelet2.showLoadingBubble();
     const result1 = await this._aiService.chat(
-      greeting,
+      prompt,
       systemPrompt1,
       config1.name,
     );
@@ -423,21 +542,26 @@ export class ConversationManager {
       chatHistory.push({ role: "assistant", content: result1.response });
       gnomelet1.showBubble(result1.response, false);
 
-      await this._delay(2000);
-
-      await this._petRespondInChat(
-        pet2Id,
-        result1.response,
-        gnomelet2,
-        chatHistory,
-      );
+      for (let i = 1; i < totalRounds; i++) {
+        await this._delay(2500);
+        await this._petRespondInChat(
+          pet2Id,
+          result1.response,
+          gnomelet2,
+          chatHistory,
+          config2,
+          gnomelet1,
+        );
+        if (chatHistory.length >= (i + 1) * 2) {
+          result1.response = chatHistory[chatHistory.length - 1].content;
+        }
+      }
     }
 
     await this._delay(3000);
     gnomelet1.stopChatting();
     gnomelet2.stopChatting();
 
-    // 保存宠物对话记忆（双方都保存）
     for (const msg of chatHistory) {
       if (msg.role === "assistant") {
         this._petConfigManager.addMemory(
@@ -458,14 +582,45 @@ export class ConversationManager {
     this._activePetPair = null;
   }
 
-  async _petRespondInChat(petId, previousMessage, gnomelet, chatHistory) {
+  _scheduleAutoTrigger(delayMs) {
+    if (this._autoTriggerTimeout) {
+      GLib.source_remove(this._autoTriggerTimeout);
+    }
+
+    this._autoTriggerTimeout = GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      delayMs,
+      () => {
+        this.triggerPetInteraction();
+        this._autoTriggerTimeout = null;
+        return GLib.SOURCE_REMOVE;
+      },
+    );
+  }
+
+  async _petRespondInChat(
+    petId,
+    previousMessage,
+    gnomelet,
+    chatHistory,
+    configPartner = null,
+    gnomeletPartner = null,
+  ) {
     const config = this.getPetConfig(petId);
     const systemPrompt = buildSystemPrompt(
       config,
       config.name,
       config.typeName,
     );
-    const prompt = `${config.name} responds to ${previousMessage}.`;
+
+    let prompt = `${config.name} responds to the previous message naturally.`;
+    if (configPartner && gnomeletPartner && chatHistory.length > 2) {
+      const recentMessages = chatHistory
+        .slice(-4)
+        .map((m) => m.content)
+        .join("\n");
+      prompt = `${config.name} continues the conversation based on:\n${recentMessages}\n\nRespond naturally to continue the chat.`;
+    }
 
     const result = await this._aiService.chat(
       prompt,
@@ -476,6 +631,43 @@ export class ConversationManager {
     if (result.success) {
       chatHistory.push({ role: "assistant", content: result.response });
       gnomelet.showBubble(result.response, false);
+    }
+  }
+  async sendMessage(petId, message) {
+    const config = this.getPetConfig(petId);
+    const systemPrompt = buildSystemPrompt(
+      config,
+      config.name,
+      config.typeName,
+    );
+    if (!this._conversationHistory[petId]) {
+      this._conversationHistory[petId] = [];
+    }
+    const context = buildContextMessage(
+      this._conversationHistory[petId],
+      message,
+    );
+    try {
+      const result = await this._aiService.chat(
+        context,
+        systemPrompt,
+        config.name,
+      );
+      if (result.success) {
+        this._conversationHistory[petId].push({
+          role: "user",
+          content: message,
+        });
+        this._conversationHistory[petId].push({
+          role: "assistant",
+          content: result.response,
+        });
+        return { success: true, response: result.response };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      console.error(`[AI Chat] Exception in sendMessage:`, e);
+      return { success: false, error: e.message };
     }
   }
 
@@ -548,5 +740,26 @@ export class ConversationManager {
   destroy() {
     this._closeInputBubble();
     this._activePetPair = null;
+  }
+
+  async triggerPetInteractionNow() {
+    if (!this._isEnabled) return;
+    if (this._activePetPair !== null) return;
+
+    const gnomelets = this._petManager._gnomelets;
+    for (const g of gnomelets) {
+      if (g.isChatting()) return;
+    }
+
+    const configs = this._petConfigManager.getConfigs();
+    const petIds = Object.keys(configs);
+    if (petIds.length < 2) return;
+
+    const shuffled = petIds.sort(() => Math.random() - 0.5);
+    const pet1 = shuffled[0];
+    const pet2 = shuffled[1];
+
+    this._recordInteractionTime(pet1, pet2);
+    await this._startPetChat(pet1, pet2);
   }
 }
