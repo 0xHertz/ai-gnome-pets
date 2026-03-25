@@ -359,7 +359,7 @@ export function buildSystemPrompt(petConfig, petName, typeName) {
   let prompt = `You are ${petName}, a ${typeName.toLowerCase()} living on a computer desktop. `;
   prompt += `Your personality: ${personality}. `;
   prompt += `Speak in a ${speakingStyle} manner. `;
-  prompt += `Use emojis and ASCII art to enhance your responses. `;
+  prompt += `Use emojis to enhance your responses. `;
   prompt += `Answer in Chinese `;
   if (background) {
     prompt += `Background: ${background}. `;

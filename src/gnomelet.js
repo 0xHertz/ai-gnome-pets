@@ -428,23 +428,16 @@ export const Gnomelet = GObject.registerClass(
         vertical: true,
         style: "spacing: 2px;",
       });
-      let bubbleMargin = 20;
       if (!isOwner) {
         this._bubbleContent.add_child(this._nameLabel);
-        bubbleMargin = 65;
       }
       this._bubbleContent.add_child(label);
       this._bubbleActor.add_child(this._bubbleContent);
 
-      this._bubbleContainer = new St.Widget({
-        x: this._x + (this._displayW - bubbleWidth) / 2,
-        y: this._y - bubbleMargin,
-        width: bubbleWidth,
-        height: 55,
-      });
+      this._bubbleContainer = new St.Widget({});
       this._bubbleContainer.add_child(this._bubbleActor);
-
       Main.uiGroup.add_child(this._bubbleContainer);
+      this.updateBubblePosition();
 
       this._bubbleTimeout = GLib.timeout_add(
         GLib.PRIORITY_DEFAULT,
@@ -476,18 +469,28 @@ export const Gnomelet = GObject.registerClass(
     updateBubblePosition() {
       if (this._bubbleContainer) {
         const bubbleWidth = this._bubbleContainer.width;
-        this._bubbleContainer.set_position(
-          this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 60,
-        );
+        const bubbleMargin = 10; // 气泡底部距离宠物顶部的距离
+        // 获取气泡实际高度
+        const bubbleHeight =
+          this._bubbleContainer.height ||
+          this._bubbleContainer.get_height?.() ||
+          60;
+        // 让气泡底部和宠物顶部距离固定
+        const x = this._x + (this._displayW - bubbleWidth) / 2;
+        const y = this._y - bubbleHeight + bubbleMargin;
+        this._bubbleContainer.set_position(x, y);
       }
 
       if (this._loadingInterval && this._bubbleContainer) {
         const bubbleWidth = 80;
-        this._bubbleContainer.set_position(
-          this._x + (this._displayW - bubbleWidth) / 2,
-          this._y - 60,
-        );
+        const bubbleMargin = 10;
+        const bubbleHeight =
+          this._bubbleContainer.height ||
+          this._bubbleContainer.get_height?.() ||
+          60;
+        const x = this._x + (this._displayW - bubbleWidth) / 2;
+        const y = this._y - bubbleHeight + bubbleMargin;
+        this._bubbleContainer.set_position(x, y);
       }
 
       if (this._conversationManager) {
