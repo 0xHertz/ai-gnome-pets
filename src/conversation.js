@@ -542,19 +542,27 @@ export class ConversationManager {
       chatHistory.push({ role: "assistant", content: result1.response });
       gnomelet1.showBubble(result1.response, false);
 
-      for (let i = 1; i < totalRounds; i++) {
+      await this._delay(2500);
+      await this._petRespondInChat(
+        pet2Id,
+        result1.response,
+        gnomelet2,
+        chatHistory,
+        config2,
+        gnomelet1,
+      );
+
+      for (let i = 2; i < totalRounds; i++) {
         await this._delay(2500);
+        const lastMsg = chatHistory[chatHistory.length - 1].content;
         await this._petRespondInChat(
-          pet2Id,
-          result1.response,
-          gnomelet2,
+          i % 2 === 0 ? pet1Id : pet2Id,
+          lastMsg,
+          i % 2 === 0 ? gnomelet1 : gnomelet2,
           chatHistory,
-          config2,
-          gnomelet1,
+          i % 2 === 0 ? config1 : config2,
+          i % 2 === 0 ? gnomelet2 : gnomelet1,
         );
-        if (chatHistory.length >= (i + 1) * 2) {
-          result1.response = chatHistory[chatHistory.length - 1].content;
-        }
       }
     }
 
@@ -562,19 +570,27 @@ export class ConversationManager {
     gnomelet1.stopChatting();
     gnomelet2.stopChatting();
 
-    for (const msg of chatHistory) {
+    for (let i = 0; i < chatHistory.length; i++) {
+      const msg = chatHistory[i];
       if (msg.role === "assistant") {
+        const sender = i % 2 === 0 ? pet1Id : pet2Id;
+        const senderName = i % 2 === 0 ? config1.name : config2.name;
+
         this._petConfigManager.addMemory(
           pet1Id,
           "pet_pair",
           msg.content,
           pet2Id,
+          sender,
+          senderName,
         );
         this._petConfigManager.addMemory(
           pet2Id,
           "pet_pair",
           msg.content,
           pet1Id,
+          sender,
+          senderName,
         );
       }
     }

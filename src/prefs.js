@@ -278,7 +278,9 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
     respawnRow.add_suffix(respawnButton);
     actionsGroup.add(respawnRow);
 
-    const clearMemoryRow = new Adw.ActionRow({ title: "Clear All Pet Memories" });
+    const clearMemoryRow = new Adw.ActionRow({
+      title: "Clear All Pet Memories",
+    });
     const clearMemoryButton = new Gtk.Button({
       label: "Clear Memories",
       valign: Gtk.Align.CENTER,
@@ -293,7 +295,7 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
           }
         }
         settings.set_string("pet-configs", JSON.stringify(configs));
-        
+
         clearMemoryButton.label = "Cleared!";
         setTimeout(() => {
           clearMemoryButton.label = "Clear Memories";
@@ -307,6 +309,8 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
     actionsGroup.add(clearMemoryRow);
 
     this._buildAIPreferences(page, settings);
+
+    this._buildChatHistorySection(page, settings);
 
     window.add(page);
   }
@@ -637,6 +641,100 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
       settings.set_string("pet-configs", JSON.stringify(configs));
     } catch (e) {
       console.error("Failed to save pet config:", e);
+    }
+  }
+
+  async _buildChatHistorySection(page, settings) {
+    const { PetConfigManager } = await import("./pet-config.js");
+    const configManager = new PetConfigManager(settings);
+
+    const chatGroup = new Adw.PreferencesGroup({ title: "Chat History" });
+    page.add(chatGroup);
+
+    const conversations = configManager.getAllPetPairConversations();
+
+    if (conversations.length === 0) {
+      const emptyRow = new Adw.ActionRow({
+        title: "No conversations yet",
+        subtitle: "Pet-to-pet conversations will appear here",
+      });
+      chatGroup.add(emptyRow);
+      return;
+    }
+
+    for (const conv of conversations) {
+      const score = configManager.calculateRelationshipScore(
+        conv.pet1,
+        conv.pet2,
+      );
+      const relationship = configManager.getRelationshipLevel(score);
+
+      const expander = new Adw.ExpanderRow({
+        title: `${conv.pet1Name} ↔ ${conv.pet2Name}`,
+        subtitle: `${relationship.emoji} ${relationship.level} (${score}分)`,
+      });
+      chatGroup.add(expander);
+
+      // 用Gtk.ListBox展示聊天气泡
+      const messagesList = new Gtk.ListBox();
+      messagesList.set_selection_mode(Gtk.SelectionMode.NONE);
+      expander.add_row(messagesList);
+
+      for (let i = 0; i < conv.memories.length; i++) {
+        const memory = conv.memories[i];
+        const speaker = memory.senderName || conv.pet1Name;
+        const isFromPet1 = speaker === conv.pet1Name;
+
+        const timestamp = new Date(memory.timestamp);
+        // const timeStr = timestamp.toLocaleString();
+        const timeStr = timestamp.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const dateStr = timestamp.toLocaleDateString();
+
+        // 外层Box用于左右对齐
+        const rowBox = new Gtk.Box({
+          orientation: Gtk.Orientation.HORIZONTAL,
+          halign: isFromPet1 ? Gtk.Align.END : Gtk.Align.START,
+          margin_top: 6,
+          margin_bottom: 6,
+          margin_start: 12,
+          margin_end: 12,
+        });
+
+        // 气泡内容
+        const bubble = new Gtk.Box({
+          orientation: Gtk.Orientation.VERTICAL,
+          css_classes: [isFromPet1 ? "bubble-sent" : "bubble-received"],
+          margin_top: 2,
+          margin_bottom: 2,
+          margin_start: 8,
+          margin_end: 8,
+        });
+        const label = new Gtk.Label({
+          label: memory.content,
+          wrap: true,
+          xalign: 0,
+        });
+        // label.set_halign(Gtk.Align.START);
+        // label.set_max_width_chars(36); // 控制气泡宽度
+        // label.set_line_wrap(true);
+        bubble.append(label);
+
+        const meta = new Gtk.Label({
+          label: `${speaker}  ${dateStr} ${timeStr}`,
+          css_classes: ["bubble-meta"],
+          xalign: 1,
+          wrap: false,
+        });
+        // meta.set_halign(Gtk.Align.END);
+        bubble.append(meta);
+        rowBox.append(bubble);
+        const listRow = new Gtk.ListBoxRow();
+        listRow.set_child(rowBox);
+        messagesList.append(listRow);
+      }
     }
   }
 }
