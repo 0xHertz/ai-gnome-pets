@@ -715,9 +715,9 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
         const label = new Gtk.Label({
           label: memory.content,
           wrap: true,
-          xalign: 0,
+          xalign: isFromPet1 ? 1 : 0,
         });
-        // label.set_halign(Gtk.Align.START);
+        label.set_halign(isFromPet1 ? Gtk.Align.END : Gtk.Align.START);
         // label.set_max_width_chars(36); // 控制气泡宽度
         // label.set_line_wrap(true);
         bubble.append(label);
@@ -725,10 +725,10 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
         const meta = new Gtk.Label({
           label: `${speaker}  ${dateStr} ${timeStr}`,
           css_classes: ["bubble-meta"],
-          xalign: 1,
+          xalign: isFromPet1 ? 1 : 0,
           wrap: false,
         });
-        // meta.set_halign(Gtk.Align.END);
+        meta.set_halign(isFromPet1 ? Gtk.Align.END : Gtk.Align.START);
         bubble.append(meta);
         rowBox.append(bubble);
         const listRow = new Gtk.ListBoxRow();
