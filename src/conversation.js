@@ -267,6 +267,7 @@ export class ConversationManager {
       config1,
       config1.name,
       config1.typeName,
+      "mixed",
     );
     const context = buildContextMessage(chatHistory, message);
 
@@ -292,9 +293,11 @@ export class ConversationManager {
         null,
       );
 
-      // 保存记忆（主人参与的对话，只保存到pet1）
-      this._petConfigManager.addMemory(pet1, "owner", message);
-      this._petConfigManager.addMemory(pet1, "owner", result.response);
+      // 保存记忆（主人参与的对话，保存为mixed类型）
+      this._petConfigManager.addMemory(pet1, "mixed", message, pet2);
+      this._petConfigManager.addMemory(pet1, "mixed", result.response, pet2);
+      this._petConfigManager.addMemory(pet2, "mixed", message, pet1);
+      this._petConfigManager.addMemory(pet2, "mixed", result.response, pet1);
     }
 
     await this._delay(3000);
@@ -400,12 +403,27 @@ export class ConversationManager {
     );
 
     if (petPair1.length > 0 || petPair2.length > 0) {
-      const lastMessages = [...petPair1, ...petPair2]
+      const allMessages = [...petPair1, ...petPair2].sort(
+        (a, b) => a.timestamp - b.timestamp,
+      );
+      // 根据content去重（保留最早出现的）
+      const seen = new Set();
+      const uniqueMessages = allMessages.filter((m) => {
+        const key = m.content.substring(0, 30); // 用前30个字符作为key
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const lastMessages = uniqueMessages
         .slice(-4)
-        .map((m) => m.content)
+        .map((m) => {
+          const senderName = m.senderName;
+          return `${senderName} said to ${senderName == config1.name ? config2.name : config1.name}: ${m.content}`;
+        })
         .join("\n");
+      const prompt = `Based on previous conversation with ${config2.name}:\n${lastMessages}\n\n${config1.name} wants to continue the conversation naturally.`;
       return {
-        prompt: `Based on previous conversation with ${config2.name}:\n${lastMessages}\n\n${config1.name} wants to continue the conversation naturally.`,
+        prompt: prompt,
         hasMemory: true,
         rounds: 3 + Math.floor(Math.random() * 2),
       };
@@ -430,7 +448,6 @@ export class ConversationManager {
     };
   }
   async triggerPetInteraction() {
-    console.log(`Checking for pet interaction...`);
     const now = Date.now();
     const cooldownMs =
       this._minCooldownMs +
@@ -529,6 +546,7 @@ export class ConversationManager {
       config1,
       config1.name,
       config1.typeName,
+      "pet_pair",
     );
     gnomelet1.showLoadingBubble();
     gnomelet2.showLoadingBubble();
@@ -595,7 +613,58 @@ export class ConversationManager {
       }
     }
 
+    this._analyzePetIntimacy(pet1Id, pet2Id, config1, config2);
+
     this._activePetPair = null;
+  }
+
+  async _analyzePetIntimacy(pet1Id, pet2Id, config1, config2) {
+    const memories1 = this._petConfigManager.getPetPairMemory(pet1Id, pet2Id);
+    if (memories1.length < 2) return;
+
+    const recentMemories = memories1.slice(-6);
+    let conversationText = "";
+    for (let i = 0; i < recentMemories.length; i += 2) {
+      const msg1 = recentMemories[i];
+      const msg2 = recentMemories[i + 1];
+      if (msg1) conversationText += `${config1.name}: ${msg1.content}\n`;
+      if (msg2) conversationText += `${config2.name}: ${msg2.content}\n`;
+    }
+
+    const systemPrompt = `You are a helpful assistant that analyzes the intimacy level between two characters based on their conversations.`;
+    const prompt = `Analyze these two pets' conversations and rate their intimacy level.
+
+Conversations:
+${conversationText}
+
+How close are these two pets?
+Reply with one word only: best_friends, close_friends, friends, acquaintances, strangers, or rivals`;
+
+    try {
+      const result = await this._aiService.chat(
+        prompt,
+        systemPrompt,
+        "Analyzer",
+      );
+
+      if (result.success) {
+        const response = result.response.toLowerCase().trim();
+        let intimacy = null;
+        if (response.includes("best_friends")) intimacy = "best_friends";
+        else if (response.includes("close_friends")) intimacy = "close_friends";
+        else if (response.includes("friends")) intimacy = "friends";
+        else if (response.includes("acquaintances")) intimacy = "acquaintances";
+        else if (response.includes("strangers")) intimacy = "strangers";
+        else if (response.includes("rivals")) intimacy = "rivals";
+
+        if (intimacy) {
+          this._petConfigManager.setIntimacyScore(pet1Id, pet2Id, intimacy);
+          this._petConfigManager.setIntimacyScore(pet2Id, pet1Id, intimacy);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to analyze pet intimacy:", e);
+    }
   }
 
   _scheduleAutoTrigger(delayMs) {
@@ -627,10 +696,11 @@ export class ConversationManager {
       config,
       config.name,
       config.typeName,
+      "pet_pair",
     );
 
     let prompt = `${config.name} responds to the previous message naturally.`;
-    if (configPartner && gnomeletPartner && chatHistory.length > 2) {
+    if (configPartner && gnomeletPartner && chatHistory.length > 0) {
       const recentMessages = chatHistory
         .slice(-4)
         .map((m) => m.content)
@@ -655,6 +725,7 @@ export class ConversationManager {
       config,
       config.name,
       config.typeName,
+      "owner",
     );
     if (!this._conversationHistory[petId]) {
       this._conversationHistory[petId] = [];
@@ -700,11 +771,13 @@ export class ConversationManager {
       config1,
       config1.name,
       config1.typeName,
+      "pet_pair",
     );
     const systemPrompt2 = buildSystemPrompt(
       config2,
       config2.name,
       config2.typeName,
+      "pet_pair",
     );
 
     const result1 = await this._aiService.chat(

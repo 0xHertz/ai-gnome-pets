@@ -350,7 +350,12 @@ export class AIService {
   }
 }
 
-export function buildSystemPrompt(petConfig, petName, typeName) {
+export function buildSystemPrompt(
+  petConfig,
+  petName,
+  typeName,
+  contextType = "all",
+) {
   const personality = petConfig?.personality || "friendly and playful";
   const background = petConfig?.background || "";
   const speakingStyle = petConfig?.speakingStyle || "short and cute";
@@ -360,25 +365,35 @@ export function buildSystemPrompt(petConfig, petName, typeName) {
   prompt += `Your personality: ${personality}. `;
   prompt += `Speak in a ${speakingStyle} manner. `;
   prompt += `Use emojis to enhance your responses. `;
-  prompt += `Answer in Chinese `;
   if (background) {
-    prompt += `Background: ${background}. `;
+    prompt += `Your likes and dislikes: ${background}. `;
   }
 
-  // 添加记忆上下文
-  if (memory.length > 0) {
+  // 添加记忆上下文，根据 contextType 过滤
+  const filteredMemory = memory.filter((msg) => {
+    if (contextType === "all") return true;
+    if (contextType === "owner") return msg.type === "owner";
+    if (contextType === "pet_pair") return msg.type === "pet_pair";
+    if (contextType === "mixed") return msg.type === "mixed";
+    return true;
+  });
+
+  if (filteredMemory.length > 0) {
     prompt += `\n\nRecent memories of conversations:\n`;
-    for (const msg of memory) {
+    for (const msg of filteredMemory) {
       if (msg.type === "owner") {
         prompt += `User: ${msg.content}\n`;
       } else if (msg.type === "pet_pair") {
         prompt += `Friend: ${msg.content}\n`;
+      } else if (msg.type === "mixed") {
+        prompt += `With User and Friend: ${msg.content}\n`;
       }
     }
   }
 
   prompt +=
     "Respond to conversations in a natural, engaging way. Keep responses concise (1-3 sentences). ";
+  prompt += `Answer in Chinese `;
   return prompt;
 }
 

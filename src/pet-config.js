@@ -183,6 +183,14 @@ export class PetConfigManager {
 
     if (score > 40) score = 40;
 
+    const intimacyScore = this.getIntimacyScore(petId, partnerPetId);
+    if (intimacyScore) {
+      if (intimacyScore === "best_friends") score += 2;
+      else if (intimacyScore === "close_friends") score += 1;
+      else if (intimacyScore === "strangers") score -= 1;
+      else if (intimacyScore === "rivals") score -= 2;
+    }
+
     if (daysSinceLastChat >= 60) score -= 15;
     else if (daysSinceLastChat >= 30) score -= 10;
     else if (daysSinceLastChat >= 14) score -= 5;
@@ -201,6 +209,19 @@ export class PetConfigManager {
     if (score <= 30) return { level: "Friend", emoji: "🙂" };
     if (score <= 40) return { level: "Close Friend", emoji: "😄" };
     return { level: "Best Friend", emoji: "❤️" };
+  }
+
+  setIntimacyScore(petId, partnerPetId, intimacyScore) {
+    const config = this.getPetConfig(petId);
+    if (!config.intimacyScores) config.intimacyScores = {};
+    config.intimacyScores[partnerPetId] = intimacyScore;
+    this.setPetConfig(petId, config);
+  }
+
+  getIntimacyScore(petId, partnerPetId) {
+    const config = this.getPetConfig(petId);
+    if (!config.intimacyScores) return null;
+    return config.intimacyScores[partnerPetId];
   }
 }
 
