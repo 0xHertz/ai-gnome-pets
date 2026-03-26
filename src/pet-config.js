@@ -34,7 +34,6 @@ export class PetConfigManager {
     return {
       name: `Pet ${petId}`,
       personality: "friendly and playful",
-      speakingStyle: "short and cute",
       background: "",
       enabled: true,
     };

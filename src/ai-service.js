@@ -358,12 +358,10 @@ export function buildSystemPrompt(
 ) {
   const personality = petConfig?.personality || "friendly and playful";
   const background = petConfig?.background || "";
-  const speakingStyle = petConfig?.speakingStyle || "short and cute";
   const memory = petConfig?.memory || [];
 
   let prompt = `You are ${petName}, a ${typeName.toLowerCase()} living on a computer desktop. `;
   prompt += `Your personality: ${personality}. `;
-  prompt += `Speak in a ${speakingStyle} manner. `;
   prompt += `Use emojis to enhance your responses. `;
   if (background) {
     prompt += `Your likes and dislikes: ${background}. `;
@@ -392,7 +390,7 @@ export function buildSystemPrompt(
   }
 
   prompt +=
-    "Respond to conversations in a natural, engaging way. Keep responses concise (1-3 sentences). ";
+    "Respond to conversations in a natural way. Keep responses concise (1-3 sentences). ";
   prompt += `Answer in Chinese `;
   return prompt;
 }

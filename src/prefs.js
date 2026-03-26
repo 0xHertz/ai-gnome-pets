@@ -513,7 +513,6 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
         const config = configs[petId] || {
           name: `Pet ${petIndex + 1}`,
           personality: "friendly",
-          speakingStyle: "short and cute",
           background: "",
         };
 
@@ -532,83 +531,18 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
         nameRow.add_suffix(nameEntry);
         petCard.add(nameRow);
 
-        const personalityRow = new Adw.ComboRow({
-          title: "Personality",
-          model: new Gtk.StringList({
-            strings: [
-              "Friendly",
-              "Shy",
-              "Playful",
-              "Wise",
-              "Mischievous",
-              "Caring",
-              "Curious",
-              "Lazy",
-            ],
-          }),
+        const personalityRow = new Adw.ActionRow({ title: "Personality" });
+        const personalityEntry = new Gtk.Entry({
+          text: config.personality || "",
+          placeholder_text: "e.g., friendly, shy, playful",
+          valign: Gtk.Align.CENTER,
         });
-        const personalityMap = {
-          friendly: 0,
-          shy: 1,
-          playful: 2,
-          wise: 3,
-          mischievous: 4,
-          caring: 5,
-          curious: 6,
-          lazy: 7,
-        };
-        personalityRow.set_selected(personalityMap[config.personality] || 0);
-        personalityRow.connect("notify::selected", () => {
-          const personalities = [
-            "friendly",
-            "shy",
-            "playful",
-            "wise",
-            "mischievous",
-            "caring",
-            "curious",
-            "lazy",
-          ];
-          config.personality = personalities[personalityRow.selected];
+        personalityEntry.connect("changed", () => {
+          config.personality = personalityEntry.get_text();
           this._savePetConfig(settings, petId, config);
         });
+        personalityRow.add_suffix(personalityEntry);
         petCard.add(personalityRow);
-
-        const styleRow = new Adw.ComboRow({
-          title: "Speaking Style",
-          model: new Gtk.StringList({
-            strings: [
-              "Short & Cute",
-              "Detailed",
-              "Funny",
-              "Soft",
-              "Energetic",
-              "Calm",
-            ],
-          }),
-        });
-        const styleMap = {
-          "short and cute": 0,
-          "detailed and explanatory": 1,
-          "funny and exaggerated": 2,
-          "soft and gentle": 3,
-          "energetic and enthusiastic": 4,
-          "calm and soothing": 5,
-        };
-        styleRow.set_selected(styleMap[config.speakingStyle] || 0);
-        styleRow.connect("notify::selected", () => {
-          const styles = [
-            "short and cute",
-            "detailed and explanatory",
-            "funny and exaggerated",
-            "soft and gentle",
-            "energetic and enthusiastic",
-            "calm and soothing",
-          ];
-          config.speakingStyle = styles[styleRow.selected];
-          this._savePetConfig(settings, petId, config);
-        });
-        petCard.add(styleRow);
 
         const backgroundRow = new Adw.ActionRow({ title: "Background" });
         const backgroundEntry = new Gtk.Entry({
