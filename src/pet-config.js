@@ -60,6 +60,7 @@ export class PetConfigManager {
   ) {
     const config = this.getPetConfig(petId);
     if (!config.memory) config.memory = [];
+    config.id = petId;
 
     const receiver = sender == partnerPetId ? petId : partnerPetId;
     const receiverName = this.getPetConfig(receiver).name;
@@ -91,22 +92,117 @@ export class PetConfigManager {
   _cleanExpiredMemory(config) {
     if (!config.memory) return;
 
-    const now = Date.now();
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
-
-    // 过滤超过7天的记忆
-    config.memory = config.memory.filter((m) => now - m.timestamp < maxAge);
-
-    // 限制最多50条消息（约25轮）
     if (config.memory.length > 50) {
+      const overflow = config.memory.slice(0, config.memory.length - 50);
+      this._exportMemoryToFile(config, overflow);
       config.memory = config.memory.slice(-50);
     }
+  }
+
+  _exportMemoryToFile(config, memories) {
+    const configDir = GLib.get_user_config_dir();
+    const appDir = GLib.build_filenamev([configDir, "ai-gnomepets"]);
+
+    if (!GLib.file_test(appDir, GLib.FileTest.EXISTS)) {
+      GLib.mkdir_with_parents(appDir, 0o755);
+    }
+
+    const petId = config.id || "unknown";
+    const filePath = GLib.build_filenamev([appDir, `${petId}_memories.json`]);
+
+    let existingMemories = [];
+    if (GLib.file_test(filePath, GLib.FileTest.EXISTS)) {
+      try {
+        const [ok, contents] = GLib.file_get_contents(filePath);
+        if (ok) {
+          existingMemories = JSON.parse(new TextDecoder().decode(contents));
+        }
+      } catch (e) {
+        console.error("Failed to read existing exported memories:", e);
+      }
+    }
+
+    const allMemories = [...existingMemories, ...memories];
+    allMemories.sort((a, b) => a.timestamp - b.timestamp);
+
+    const jsonStr = JSON.stringify(allMemories, null, 2);
+    GLib.file_set_contents(filePath, new TextEncoder().encode(jsonStr));
+  }
+
+  getExportedMemories(petId) {
+    const configDir = GLib.get_user_config_dir();
+    const filePath = GLib.build_filenamev([configDir, "ai-gnomepets", `${petId}_memories.json`]);
+
+    if (!GLib.file_test(filePath, GLib.FileTest.EXISTS)) {
+      return [];
+    }
+
+    try {
+      const [ok, contents] = GLib.file_get_contents(filePath);
+      if (ok) {
+        return JSON.parse(new TextDecoder().decode(contents));
+      }
+    } catch (e) {
+      console.error("Failed to read exported memories:", e);
+    }
+    return [];
+  }
+
+  getAllMemoriesWithExported(petId, partnerPetId) {
+    const config = this.getPetConfig(petId);
+    const currentMemory = config.memory || [];
+    const exportedMemory = this.getExportedMemories(petId);
+
+    const filteredExported = exportedMemory.filter(
+      (m) => m.partnerPetId === partnerPetId
+    );
+    const filteredCurrent = currentMemory.filter(
+      (m) => m.partnerPetId === partnerPetId
+    );
+
+    return [...filteredExported, ...filteredCurrent].sort((a, b) => a.timestamp - b.timestamp);
   }
 
   clearMemory(petId) {
     const config = this.getPetConfig(petId);
     config.memory = [];
     this.setPetConfig(petId, config);
+    this.clearExportedMemory(petId);
+  }
+
+  clearExportedMemory(petId) {
+    const configDir = GLib.get_user_config_dir();
+    const filePath = GLib.build_filenamev([configDir, "ai-gnomepets", `${petId}_memories.json`]);
+
+    if (GLib.file_test(filePath, GLib.FileTest.EXISTS)) {
+      try {
+        GLib.unlink(filePath);
+      } catch (e) {
+        console.error("Failed to delete exported memory file:", e);
+      }
+    }
+  }
+
+  clearAllExportedMemories() {
+    const configDir = GLib.get_user_config_dir();
+    const appDir = GLib.build_filenamev([configDir, "ai-gnomepets"]);
+
+    if (!GLib.file_test(appDir, GLib.FileTest.EXISTS)) return;
+
+    try {
+      const dir = Gio.File.new_for_path(appDir);
+      const enumerator = dir.enumerate_children("standard::name", Gio.FileQueryInfoFlags.NONE, null);
+      let fileInfo;
+      while ((fileInfo = enumerator.next_file(null))) {
+        const fileName = fileInfo.get_name();
+        if (fileName.endsWith("_memories.json")) {
+          const filePath = GLib.build_filenamev([appDir, fileName]);
+          GLib.unlink(filePath);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to clear exported memories:", e);
+    }
   }
 
   getPetPairMemory(petId, partnerPetId) {
@@ -134,9 +230,7 @@ export class PetConfigManager {
         if (processedPairs.has(pairKey)) continue;
         processedPairs.add(pairKey);
 
-        const partnerMemories = petPairs.filter(
-          (m) => m.partnerPetId === partnerId,
-        );
+        const partnerMemories = this.getAllMemoriesWithExported(petId, partnerId);
         partnerMemories.sort((a, b) => a.timestamp - b.timestamp);
 
         const pet1Config = configs[petId] || { name: petId };

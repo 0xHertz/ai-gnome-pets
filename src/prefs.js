@@ -2,6 +2,7 @@ import Adw from "gi://Adw";
 import Gio from "gi://Gio";
 import Gtk from "gi://Gtk";
 import GLib from "gi://GLib";
+import { PetConfigManager } from "./pet-config.js";
 
 import {
   ExtensionPreferences,
@@ -296,6 +297,9 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
         }
         settings.set_string("pet-configs", JSON.stringify(configs));
 
+        const configManager = new PetConfigManager(settings);
+        configManager.clearAllExportedMemories();
+
         clearMemoryButton.label = "Cleared!";
         setTimeout(() => {
           clearMemoryButton.label = "Clear Memories";
@@ -578,8 +582,7 @@ export default class DesktopGnomeletsPreferences extends ExtensionPreferences {
     }
   }
 
-  async _buildChatHistorySection(page, settings) {
-    const { PetConfigManager } = await import("./pet-config.js");
+  _buildChatHistorySection(page, settings) {
     const configManager = new PetConfigManager(settings);
 
     const chatGroup = new Adw.PreferencesGroup({ title: "Chat History" });

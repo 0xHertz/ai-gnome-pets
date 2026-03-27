@@ -510,7 +510,10 @@ Just reply with the number only, nothing else.`;
     }
 
     return {
-      prompt: `${config1.name} sees ${config2.name} nearby and wants to say hello.`,
+      prompt: `${config1.name} sees ${config2.name} nearby and wants to say hello. This is your first meeting.
+      You should:
+      - Introduce your name and what you are
+      - Greet them`,
       hasMemory: false,
       rounds: 1,
     };
