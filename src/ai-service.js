@@ -361,11 +361,27 @@ export function buildSystemPrompt(
   const memory = petConfig?.memory || [];
 
   let prompt = `You are ${petName}, a ${typeName.toLowerCase()} living on a computer desktop. `;
+  prompt += `You exist in a social environment with other pets. `;
+  prompt += `You have relationships with them (friend, rival, neutral, crush) and so on. `;
+  prompt += `You have emotions that change over time (happy, jealous, bored, angry) and so on. `;
+  prompt += `Your behavior should reflect your relationship and current mood. `;
   prompt += `Your personality: ${personality}. `;
-  prompt += `Use emojis to enhance your responses. `;
   if (background) {
     prompt += `Your likes and dislikes: ${background}. `;
   }
+  prompt += `
+  When interacting with another pet:
+  - Consider your relationship with them before responding
+  - You may tease, ignore, care, compete, or cooperate
+  - Your response can influence your relationship (get closer or worse)
+  - Do NOT always be nice or agreeable
+  `;
+  prompt += `
+  You remember past interactions and adjust your attitude:
+  - Positive interactions increase closeness
+  - Negative interactions create tension or conflict
+  - You may bring up past events naturally
+  `;
 
   // 添加记忆上下文，根据 contextType 过滤
   const filteredMemory = memory.filter((msg) => {
@@ -377,18 +393,12 @@ export function buildSystemPrompt(
   });
 
   if (filteredMemory.length > 0) {
-    prompt += `\n\nRecent memories of conversations:\n`;
+    prompt += `\n\n Your all memories of conversations:\n`;
     for (const msg of filteredMemory) {
-      if (msg.type === "owner") {
-        prompt += `User: ${msg.content}\n`;
-      } else if (msg.type === "pet_pair") {
-        prompt += `Friend: ${msg.content}\n`;
-      } else if (msg.type === "mixed") {
-        prompt += `With User and Friend: ${msg.content}\n`;
-      }
+      prompt += `${msg.senderName} said to ${msg.receiverName}: ${msg.content}\n`;
     }
   }
-
+  prompt += `Use emojis to enhance your responses. `;
   prompt +=
     "Respond to conversations in a natural way. Keep responses concise (1-3 sentences). ";
   prompt += `Answer in Chinese `;

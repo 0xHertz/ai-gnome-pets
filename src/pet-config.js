@@ -61,6 +61,8 @@ export class PetConfigManager {
     const config = this.getPetConfig(petId);
     if (!config.memory) config.memory = [];
 
+    const receiver = sender == partnerPetId ? petId : partnerPetId;
+    const receiverName = this.getPetConfig(receiver).name;
     const now = Date.now();
     config.memory.push({
       type,
@@ -68,6 +70,8 @@ export class PetConfigManager {
       partnerPetId,
       sender,
       senderName,
+      receiver: receiver,
+      receiverName: receiverName,
       timestamp: now,
     });
 

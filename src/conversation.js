@@ -222,6 +222,7 @@ export class ConversationManager {
 
   async _handleOwnerToPetChat(petId, message) {
     const gnomelet = this._findGnomeletByPetId(petId);
+    const config = this.getPetConfig(petId);
 
     if (!gnomelet) {
       return;
@@ -245,9 +246,23 @@ export class ConversationManager {
     await this._delay(3000);
     gnomelet.stopChatting();
 
-    this._petConfigManager.addMemory(petId, "owner", message);
+    this._petConfigManager.addMemory(
+      petId,
+      "owner",
+      message,
+      "owner",
+      "owner",
+      "owner",
+    );
     if (result.success) {
-      this._petConfigManager.addMemory(petId, "owner", result.response);
+      this._petConfigManager.addMemory(
+        petId,
+        "owner",
+        result.response,
+        "owner",
+        petId,
+        config.name,
+      );
     }
   }
 
@@ -305,7 +320,57 @@ export class ConversationManager {
     gnomelet2.stopChatting();
     this._activePetPair = null;
   }
-  _calculateTriggerScore(pet1Id, pet2Id) {
+
+  async _calculatePersonalityScore(pet1Id, pet2Id) {
+    const config1 = this.getPetConfig(pet1Id);
+    const config2 = this.getPetConfig(pet2Id);
+
+    const personality1 = config1.personality || "friendly";
+    const personality2 = config2.personality || "friendly";
+    const like_dislike1 = config1.background || "";
+    const like_dislike2 = config2.background || "";
+
+    const systemPrompt =
+      "You are an assistant that analyzes personality compatibility between two characters.";
+    const prompt = `Analyze the personality compatibility between two pets:
+
+Pet 1: ${config1.name}
+Personality: ${personality1}
+like and dislike: ${like_dislike1}
+
+Pet 2: ${config2.name}
+Personality: ${personality2}
+like and dislike: ${like_dislike2}
+
+Based on their information, rate how likely they are to initiate a conversation with each other.
+
+Reply with a number from -10 to +10:
+- +10: They would be very eager to talk to each other
+- 0: Neutral, depends on other factors
+- -10: They would be very reluctant to interact
+
+Just reply with the number only, nothing else.`;
+
+    try {
+      const result = await this._aiService.chat(
+        prompt,
+        systemPrompt,
+        "Analyzer",
+      );
+      if (result.success) {
+        const response = result.response.trim();
+        const score = parseInt(response, 10);
+        if (!isNaN(score)) {
+          return Math.max(-10, Math.min(10, score));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to calculate personality score:", e);
+    }
+    return 0;
+  }
+
+  _calculateTriggerScore(pet1Id, pet2Id, personalityScore = 0) {
     let memoryScore = 0;
     let proximityScore = 15;
     let idleScore = 10;
@@ -350,7 +415,9 @@ export class ConversationManager {
       else if (isIdle1 || isIdle2) idleScore = 10;
       else idleScore = 0;
     }
-    return memoryScore + proximityScore + idleScore + randomFactor;
+    return (
+      memoryScore + proximityScore + idleScore + randomFactor + personalityScore
+    );
   }
   _getCooldownMs(pet1Id, pet2Id) {
     const config1 = this.getPetConfig(pet1Id);
@@ -418,7 +485,8 @@ export class ConversationManager {
         .slice(-4)
         .map((m) => {
           const senderName = m.senderName;
-          return `${senderName} said to ${senderName == config1.name ? config2.name : config1.name}: ${m.content}`;
+          const receiverName = m.receiverName;
+          return `${senderName} said to ${receiverName}: ${m.content}`;
         })
         .join("\n");
       const prompt = `Based on previous conversation with ${config2.name}:\n${lastMessages}\n\n${config1.name} wants to continue the conversation naturally.`;
@@ -472,6 +540,22 @@ export class ConversationManager {
     const petIds = Object.keys(configs);
     if (petIds.length < 2) return;
 
+    // const personalityScores = {};
+    // const scorePromises = [];
+    // for (let i = 0; i < petIds.length; i++) {
+    //   for (let j = i + 1; j < petIds.length; j++) {
+    //     const pet1 = petIds[i];
+    //     const pet2 = petIds[j];
+    //     const pairKey = [pet1, pet2].sort().join("|");
+    //     scorePromises.push(
+    //       this._calculatePersonalityScore(pet1, pet2).then((score) => {
+    //         personalityScores[pairKey] = score;
+    //       }),
+    //     );
+    //   }
+    // }
+    // await Promise.all(scorePromises);
+
     let bestPair = null;
     let bestScore = 0;
 
@@ -479,12 +563,14 @@ export class ConversationManager {
       for (let j = i + 1; j < petIds.length; j++) {
         const pet1 = petIds[i];
         const pet2 = petIds[j];
+        // const pairKey = [pet1, pet2].sort().join("|");
+        // const personalityScore = personalityScores[pairKey] || 0;
 
         if (!this._canTriggerInteraction(pet1, pet2)) {
           continue;
         }
 
-        const score = this._calculateTriggerScore(pet1, pet2);
+        const score = this._calculateTriggerScore(pet1, pet2, 0);
         if (score > bestScore) {
           bestScore = score;
           bestPair = [pet1, pet2];
@@ -492,7 +578,7 @@ export class ConversationManager {
       }
     }
 
-    if (bestPair) {
+    if (bestPair && Math.random() < 0.5) {
       const gnomelet1 = this._findGnomeletByPetId(bestPair[0]);
       const gnomelet2 = this._findGnomeletByPetId(bestPair[1]);
       let distance = 9999;
