@@ -400,7 +400,7 @@ export function buildSystemPrompt(
   }
   prompt += `Use emojis to enhance your responses. `;
   prompt +=
-    "Respond to conversations in a natural way. Keep responses concise (1-3 sentences). ";
+    "Respond to conversations in a natural way like daily talk. Keep responses concise (1-3 sentences). ";
   prompt += `Answer in Chinese `;
   return prompt;
 }

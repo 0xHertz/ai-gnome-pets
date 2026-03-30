@@ -41,6 +41,9 @@ export const Gnomelet = GObject.registerClass(
       this._vy = 0; // Velocity Y
       this._savedState = null; // Save state before chatting
 
+      // --- Name Label State ---
+      this._nameLabelVisible = false;
+
       // --- Animation State ---
       this._frame = 0; // Current sprite frame index
       this._animationTimer = 0; // Counter for animation timing
@@ -89,21 +92,8 @@ export const Gnomelet = GObject.registerClass(
       this.actor.set_position(this._x, this._y);
 
       this._updateInteraction();
-      this._setupTooltip();
       this.updateJumpPower();
       this._updateAnimation();
-    }
-
-    _setupTooltip() {
-      this.actor.connect("notify::hover", () => {
-        const config = this._conversationManager
-          ? this._conversationManager.getPetConfig(this._petId)
-          : null;
-        const name = config?.name || this._typeName || "Pet";
-        if (this.actor.hover) {
-          this.actor.set_tooltip_text(name);
-        }
-      });
     }
 
     // Property to define facing based on Velocity X
@@ -226,6 +216,7 @@ export const Gnomelet = GObject.registerClass(
                     GLib.source_remove(this._clickTimer);
                     this._clickTimer = null;
                   }
+                  this._toggleNameLabel();
                   return GLib.SOURCE_REMOVE;
                 },
               );
@@ -320,6 +311,56 @@ export const Gnomelet = GObject.registerClass(
         .split("")
         .reduce((acc, char) => acc + char.charCodeAt(0), 0);
       return colors[hash % colors.length];
+    }
+
+    _showNameLabel() {
+      this._hideBubble();
+
+      const bubbleWidth = 100;
+      const borderColor = this._isPairChat ? "#4a90d9" : "#000000";
+      const petName = this._getPetName();
+      const nameColor = this._getPetNameColor();
+
+      this._bubbleActor = new St.Widget({
+        style: `background-color: #ffffff;
+                        border: 3px solid ${borderColor};
+                        border-radius: 0px;
+                        padding: 6px 10px;
+                        color: #000000;
+                        font-size: 12px;
+                        font-family: monospace;`,
+      });
+
+      this._nameLabel = new St.Label({
+        text: petName,
+        style: `color: ${nameColor}; font-weight: bold; font-size: 14px; font-family: monospace;margin-left: 4px;`,
+      });
+
+      this._bubbleContent = new St.BoxLayout({
+        vertical: true,
+        style: "spacing: 2px;",
+      });
+      this._bubbleContent.add_child(this._nameLabel);
+      this._bubbleActor.add_child(this._bubbleContent);
+
+      this._bubbleContainer = new St.Widget({
+        x: this._x + (this._displayW - bubbleWidth) / 2,
+        y: this._y - 20,
+        width: bubbleWidth,
+        height: 40,
+      });
+      this._bubbleContainer.add_child(this._bubbleActor);
+      Main.uiGroup.add_child(this._bubbleContainer);
+      this._nameLabelVisible = true;
+    }
+
+    _toggleNameLabel() {
+      if (this._nameLabelVisible) {
+        this._hideBubble();
+        this._nameLabelVisible = false;
+      } else {
+        this._showNameLabel();
+      }
     }
 
     showLoadingBubble() {

@@ -372,9 +372,10 @@ Just reply with the number only, nothing else.`;
 
   _calculateTriggerScore(pet1Id, pet2Id, personalityScore = 0) {
     let memoryScore = 0;
-    let proximityScore = 15;
+    let proximityScore = 25;
     let idleScore = 10;
     let randomFactor = Math.random() * 10;
+    let firstMeetBonus = 0;
     const config1 = this.getPetConfig(pet1Id);
     const config2 = this.getPetConfig(pet2Id);
     const memory1 = config1.memory || [];
@@ -391,6 +392,8 @@ Just reply with the number only, nothing else.`;
       memoryScore = 40;
     } else if (owner1.length > 0 || owner2.length > 0) {
       memoryScore = 20;
+    } else {
+      firstMeetBonus = 25;
     }
     const gnomelet1 = this._findGnomeletByPetId(pet1Id);
     const gnomelet2 = this._findGnomeletByPetId(pet2Id);
@@ -398,9 +401,9 @@ Just reply with the number only, nothing else.`;
       const dx = Math.abs(gnomelet1._x - gnomelet2._x);
       const dy = Math.abs(gnomelet1._y - gnomelet2._y);
       const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance < 200) proximityScore = 30;
-      else if (distance < 500) proximityScore = 20;
-      else proximityScore = 10;
+      if (distance < 200) proximityScore = 50;
+      else if (distance < 500) proximityScore = 35;
+      else proximityScore = 20;
       const state1 = gnomelet1._state;
       const state2 = gnomelet2._state;
       const State = {
@@ -416,7 +419,7 @@ Just reply with the number only, nothing else.`;
       else idleScore = 0;
     }
     return (
-      memoryScore + proximityScore + idleScore + randomFactor + personalityScore
+      memoryScore + proximityScore + idleScore + randomFactor + personalityScore + firstMeetBonus
     );
   }
   _getCooldownMs(pet1Id, pet2Id) {
@@ -435,9 +438,9 @@ Just reply with the number only, nothing else.`;
     if (petPair1.length > 0 || petPair2.length > 0) {
       return 2 * 60 * 1000 + Math.random() * 2 * 60 * 1000;
     } else if (owner1 > 0 || owner2 > 0) {
-      return 4 * 60 * 1000 + Math.random() * 2 * 60 * 1000;
+      return 3 * 60 * 1000 + Math.random() * 2 * 60 * 1000;
     } else {
-      return 8 * 60 * 1000 + Math.random() * 4 * 60 * 1000;
+      return 2 * 60 * 1000 + Math.random() * 1 * 60 * 1000;
     }
   }
   _canTriggerInteraction(pet1Id, pet2Id) {
@@ -571,6 +574,32 @@ Just reply with the number only, nothing else.`;
 
         if (!this._canTriggerInteraction(pet1, pet2)) {
           continue;
+        }
+
+        const config1 = this.getPetConfig(pet1);
+        const config2 = this.getPetConfig(pet2);
+        const memory1 = config1.memory || [];
+        const memory2 = config2.memory || [];
+        const petPair1 = memory1.filter(
+          (m) => m.type === "pet_pair" && m.partnerPetId === pet2,
+        );
+        const petPair2 = memory2.filter(
+          (m) => m.type === "pet_pair" && m.partnerPetId === pet1,
+        );
+        const isFirstMeet = petPair1.length === 0 && petPair2.length === 0;
+        const gnomelet1 = this._findGnomeletByPetId(pet1);
+        const gnomelet2 = this._findGnomeletByPetId(pet2);
+        let distance = 9999;
+        if (gnomelet1 && gnomelet2) {
+          const dx = Math.abs(gnomelet1._x - gnomelet2._x);
+          const dy = Math.abs(gnomelet1._y - gnomelet2._y);
+          distance = Math.sqrt(dx * dx + dy * dy);
+        }
+
+        if (isFirstMeet && distance < 400) {
+          this._recordInteractionTime(pet1, pet2);
+          await this._startPetChat(pet1, pet2);
+          return;
         }
 
         const score = this._calculateTriggerScore(pet1, pet2, 0);

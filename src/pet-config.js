@@ -247,8 +247,8 @@ export class PetConfigManager {
     }
 
     conversations.sort((a, b) => {
-      const aTime = a.memories.length > 0 ? a.memories[0].timestamp : 0;
-      const bTime = b.memories.length > 0 ? b.memories[0].timestamp : 0;
+      const aTime = a.memories.length > 0 ? a.memories[a.memories.length - 1].timestamp : 0;
+      const bTime = b.memories.length > 0 ? b.memories[b.memories.length - 1].timestamp : 0;
       return bTime - aTime;
     });
 
